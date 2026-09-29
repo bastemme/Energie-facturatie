@@ -108,6 +108,45 @@ def cmd_seed_demo(_args) -> None:
         print(f"Demo-klant: {client.id} — {run.findings_total} bevindingen (SYNTHETISCHE data).")
 
 
+DEMO_EMAIL = "demo@factuurspoor.nl"
+DEMO_PASSWORD = "demo-wachtwoord-2026"  # noqa: S105 - local demo only; refused in production
+
+
+def cmd_demo(args) -> None:
+    """One command for beginners: demo data + demo login + start the app + open the browser."""
+    import threading
+    import webbrowser
+
+    import uvicorn
+
+    from app.config import get_settings
+    from app.models import User
+    from app.web.security import hash_password
+
+    if get_settings().is_production:
+        sys.exit("De demo-modus is niet beschikbaar in productie.")
+    init_engine()
+    create_all()
+    with session_scope() as db:
+        if not db.scalar(select(User).where(User.email == DEMO_EMAIL)):
+            db.add(User(email=DEMO_EMAIL, full_name="Demo gebruiker", password_hash=hash_password(DEMO_PASSWORD),
+                        role=Role.ADMIN))
+    cmd_seed_demo(args)
+    url = f"http://127.0.0.1:{args.port}"
+    print("\n" + "=" * 60)
+    print(f"  Factuurspoor draait op:  {url}")
+    print(f"  Inloggen op:             {url}/login")
+    print(f"  E-mailadres:             {DEMO_EMAIL}")
+    print(f"  Wachtwoord:              {DEMO_PASSWORD}")
+    print("  Stoppen: sluit dit venster (of druk op Ctrl+C).")
+    print("=" * 60 + "\n")
+    if not args.no_browser:
+        threading.Timer(2.0, lambda: webbrowser.open(url)).start()
+    from app.web.app import create_app
+
+    uvicorn.run(create_app(), host="127.0.0.1", port=args.port, log_level="warning")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -119,6 +158,10 @@ def main(argv: list[str] | None = None) -> None:
     p.set_defaults(func=cmd_create_admin)
     sub.add_parser("retention").set_defaults(func=cmd_retention)
     sub.add_parser("seed-demo").set_defaults(func=cmd_seed_demo)
+    d = sub.add_parser("demo", help="demo data + demo login + start + open browser")
+    d.add_argument("--port", type=int, default=8000)
+    d.add_argument("--no-browser", action="store_true")
+    d.set_defaults(func=cmd_demo)
     args = parser.parse_args(argv)
     args.func(args)
 

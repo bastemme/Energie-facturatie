@@ -10,6 +10,10 @@ and turns confirmed findings into recovery claims on a no cure, no pay basis.
 See **[docs/product-architecture.md](docs/product-architecture.md)** for the architecture, data model and
 design decisions, and **[docs/operations.md](docs/operations.md)** for deployment and operations.
 
+## Quick look (no technical knowledge needed)
+
+See **[HOE TE STARTEN.md](HOE%20TE%20STARTEN.md)**: download the ZIP, double-click the start file for your system, and log in with the demo account.
+
 ## What it does
 
 ```
