@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # Optional outbound webhook for lead/CRM integration (POST JSON, no invoice data)
     lead_webhook_url: str | None = None
 
-    operator_name: str = "Energiefactuur Controle"
+    operator_name: str = "Factuurspoor"
     operator_email: str = "info@example.nl"
 
     @property
