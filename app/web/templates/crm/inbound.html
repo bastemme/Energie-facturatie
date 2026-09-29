@@ -1,0 +1,40 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% block title %}{{ m.subject }}{% endblock %}
+{% block content %}
+<div class="page"{% if pending %} data-pulse="/app/ops/pulse" data-pulse-v="{{ pulse }}"{% endif %}>
+  {% call ui.page_head(m.subject, 'Van ' ~ (m.from_name ~ ' <' ~ m.from_email ~ '>' if m.from_name else m.from_email) ~ ' · ' ~ (m.received_at|d), [('Inbox', '/app/inbox')]) %}
+    {% if m.source == 'mock' %}{{ crm.env(False) }}{% endif %}
+    <form method="post" action="/app/inbox/{{ m.id }}/update" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="handled" value="{{ '0' if m.handled else '1' }}"><button class="btn{{ '' if m.handled else ' btn-primary' }}" type="submit">{{ icon('check') }}{{ 'Markeer als ongelezen' if m.handled else 'Afgehandeld' }}</button></form>
+  {% endcall %}
+
+  {% if pending %}<div class="alert info">{{ icon('settings') }}<span><b>De Email-agent classificeert dit bericht.</b> Deze pagina werkt zichzelf bij.</span></div>{% endif %}
+
+  <div class="grid-3-1">
+    <div class="stack-lg">
+      <section class="panel"><div class="panel-body"><div class="quoted">{{ m.body }}</div></div></section>
+      {% if original %}<details class="panel disclose"><summary class="panel-head"><h2>Ons bericht: {{ original.subject }}</h2>{{ icon('arrow-right') }}</summary><div class="panel-body"><div class="quoted small">{{ original.body }}</div></div></details>{% endif %}
+    </div>
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><h2>Classificatie</h2>{{ crm.reply(m.category) }}</div>
+        <div class="panel-body stack">
+          {% if m.category %}
+          <div class="row small">{{ ui.conf(m.category_confidence) if m.category_confidence else '' }}<span class="muted">{{ 'door de Email-agent (vaste regels)' if m.classified_by_agent_id else 'handmatig' }}</span></div>
+          <div><div class="label">Herkend in de tekst</div><ul class="reasons mt-xs">{% for r in m.category_reasons or [] %}<li>{{ icon('arrow-right') }}<span>{{ r }}</span></li>{% endfor %}</ul></div>
+          {% endif %}
+          <form method="post" action="/app/inbox/{{ m.id }}/update" class="row">{{ ui.csrf_field() }}<label class="sr-only" for="cat">Classificatie aanpassen</label><select id="cat" name="category">{% for c in categories %}<option value="{{ c.value }}"{% if m.category == c %} selected{% endif %}>{{ REPLIES[c][0] }}</option>{% endfor %}</select><button class="btn btn-sm" type="submit">Aanpassen</button></form>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Lead</h2></div>
+        <div class="panel-body stack">
+          {% if p %}<div><a class="primary" href="/app/leads/{{ p.id }}"><b>{{ p.company_name }}</b></a><div class="row mt-xs">{{ crm.stage(p.stage) }} {{ crm.dnc(p.do_not_contact) }}</div>{% if p.next_action %}<p class="small muted mt-xs">Volgende actie: {{ p.next_action }}</p>{% endif %}</div>
+          {% else %}<p class="small muted">Dit adres hoort niet bij een bekende lead of contact. De classificatie is vastgelegd, maar er is geen lead bijgewerkt.</p>{% endif %}
+          {% if draft %}<a class="btn btn-primary" href="/app/outreach/{{ draft.id }}">{{ icon('send') }}Antwoord beoordelen</a>{% elif m.category and m.category.value in ('UNSUBSCRIBE', 'NOT_INTERESTED') %}<p class="small muted">Geen antwoord opgesteld: we schrijven niet terug naar iemand die heeft afgezegd.</p>{% endif %}
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

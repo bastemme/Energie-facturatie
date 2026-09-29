@@ -16,7 +16,8 @@ from app.services.recovery import conservative_total
 
 POTENTIAL_STATUSES = {ReviewStatus.OPEN, ReviewStatus.INVESTIGATING, ReviewStatus.INFO_REQUESTED,
                       ReviewStatus.CONFIRMED}
-INVESTIGATING_CASES = {CaseStatus.DETECTED, CaseStatus.REVIEW, CaseStatus.VERIFIED, CaseStatus.CLIENT_APPROVAL}
+INVESTIGATING_CASES = {CaseStatus.DETECTED, CaseStatus.REVIEW, CaseStatus.VERIFIED, CaseStatus.CLAIM_PREPARED,
+                       CaseStatus.CLIENT_APPROVAL}
 SUBMITTED_CASES = {CaseStatus.SUBMITTED, CaseStatus.SUPPLIER_REVIEW, CaseStatus.NEGOTIATION, CaseStatus.APPROVED,
                    CaseStatus.DISPUTED}
 

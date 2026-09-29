@@ -1,0 +1,59 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% block title %}Leads{% endblock %}
+{% block content %}
+<div class="page page-wide">
+  {% call ui.page_head('Leads', 'Bedrijven in de pijplijn: gevonden door de Lead Researcher of aangemeld via de website. Elk gegeven heeft een bron; wat niet gevonden is, staat als onbekend.') %}
+    <a class="btn btn-primary" href="/app/leads/find">{{ icon('search') }}Leads zoeken</a>
+  {% endcall %}
+
+  {% if not any_leads %}
+  <div class="panel">{% call ui.empty('target', 'Nog geen leads', 'Laat de Lead Researcher bedrijven zoeken die in aanmerking komen voor een controle van hun energiefacturen. U ziet de voortgang live in AI Operations.') %}<a class="btn btn-primary" href="/app/leads/find">{{ icon('search') }}Eerste leads zoeken</a>{% endcall %}</div>
+  {% else %}
+  <nav class="tabs" aria-label="Status">
+    <a href="/app/leads?{{ qs_nostage }}"{% if not filters.stage %} aria-current="page"{% endif %}>Alle <span class="count">{{ all_count }}</span></a>
+    {% for st, (label, cls) in STAGES.items() if stage_counts.get(st) %}<a href="/app/leads?stage={{ st.value }}{% for k, v in filters.items() if v and k != 'stage' %}&{{ k }}={{ v|urlencode }}{% endfor %}"{% if filters.stage == st.value %} aria-current="page"{% endif %}>{{ label }} <span class="count">{{ stage_counts[st] }}</span></a>{% endfor %}
+  </nav>
+
+  <form class="filters" method="get" action="/app/leads" role="search">
+    {% if filters.stage %}<input type="hidden" name="stage" value="{{ filters.stage }}">{% endif %}
+    <label class="sr-only" for="q">Zoeken</label><input id="q" type="search" name="q" value="{{ filters.q }}" placeholder="Zoek bedrijf, plaats, domein">
+    <label class="sr-only" for="f-sector">Branche</label><select id="f-sector" name="sector"><option value="">Alle branches</option>{% for s in sectors_used %}<option value="{{ s }}"{% if filters.sector == s %} selected{% endif %}>{{ crm.sector_label(s) }}</option>{% endfor %}</select>
+    <label class="sr-only" for="f-q">Kwalificatie</label><select id="f-q" name="qualification"><option value="">Elke kwalificatie</option><option value="good"{% if filters.qualification == 'good' %} selected{% endif %}>Sterk of goed</option>{% for q, (label, _) in QUALIFICATIONS.items() %}<option value="{{ q.value }}"{% if filters.qualification == q.value %} selected{% endif %}>{{ label }}</option>{% endfor %}<option value="none"{% if filters.qualification == 'none' %} selected{% endif %}>Nog niet beoordeeld</option></select>
+    <label class="sr-only" for="f-c">Contact</label><select id="f-c" name="contact"><option value="">Elk contactstatus</option><option value="named"{% if filters.contact == 'named' %} selected{% endif %}>Beslisser met naam</option><option value="email"{% if filters.contact == 'email' %} selected{% endif %}>Met e-mailadres</option><option value="none"{% if filters.contact == 'none' %} selected{% endif %}>Contact niet gevonden</option><option value="contacted"{% if filters.contact == 'contacted' %} selected{% endif %}>Al gemaild</option></select>
+    <label class="sr-only" for="f-city">Plaats</label><input id="f-city" class="city" type="text" name="city" value="{{ filters.city }}" placeholder="Plaats">
+    <button class="btn" type="submit">{{ icon('filter') }}Filteren</button>
+    {% if qs %}<a class="reset" href="/app/leads">Wissen</a>{% endif %}
+  </form>
+
+  <form method="post" action="/app/leads/bulk" id="bulk">
+    {{ ui.csrf_field() }}<input type="hidden" name="next_url" value="/app/leads?{{ qs }}">
+    <section class="panel">
+      {% if leads %}
+      <div class="table-wrap"><table class="table stack-sm leads-table">
+        <thead><tr><th class="sr-only">Selecteer</th><th>Bedrijf</th><th>Branche · plaats</th><th>Contact</th><th>Status</th><th>Kwalificatie</th><th>Volgende actie</th><th class="r">Fit</th></tr></thead>
+        <tbody>{% for p in leads %}{% set c = p.primary_contact %}<tr{% if p.do_not_contact %} class="suppressed"{% endif %}>
+          <td><input type="checkbox" name="ids" value="{{ p.id }}" aria-label="Selecteer {{ p.company_name }}"></td>
+          <td><div class="co-cell">{{ crm.co_mono(p.company_name) }}<div><a class="primary" href="/app/leads/{{ p.id }}">{{ p.company_name }}</a><span class="sub">{% if p.domain %}{{ p.domain }}{% else %}website onbekend{% endif %} {{ crm.testdata(p.is_test_data) }}</span></div></div></td>
+          <td data-label="Branche">{{ crm.sector_label(p.sector) }}<span class="sub">{{ p.city or 'plaats onbekend' }}{% if p.locations_count %} · {{ p.locations_count }} vestigingen{% endif %}</span></td>
+          <td data-label="Contact">{{ crm.contact_short(c) }}</td>
+          <td data-label="Status">{{ crm.stage(p.stage) }} {{ crm.dnc(p.do_not_contact) }}</td>
+          <td data-label="Kwalificatie">{{ crm.qual(p.qualification) }}</td>
+          <td data-label="Volgende actie" class="small">{{ p.next_action or '—' }}{% if p.last_contact_at %}<span class="sub">Laatste contact {{ p.last_contact_at|ago }}</span>{% endif %}</td>
+          <td class="r num" data-label="Fitscore">{{ p.fit_score if p.source != 'aanvraag' else '—' }}</td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+      {% if pages > 1 %}<div class="pagination"><span>{{ total }} leads · pagina {{ page }} van {{ pages }}</span><span class="actions">{% if page > 1 %}<a class="btn btn-sm" href="/app/leads?{{ qs }}&page={{ page - 1 }}">Vorige</a>{% endif %}{% if page < pages %}<a class="btn btn-sm" href="/app/leads?{{ qs }}&page={{ page + 1 }}">Volgende</a>{% endif %}</span></div>{% endif %}
+      {% else %}{{ ui.empty('filter', 'Geen leads met deze filters', 'Pas de filters aan of wis ze om alle leads te zien.', '/app/leads', 'Filters wissen') }}{% endif %}
+    </section>
+    {% if leads %}
+    <div class="bulkbar"><span>Met de selectie:</span><span class="actions">
+      <button class="btn btn-sm" name="action" value="qualify" type="submit">Kwalificeren</button>
+      <button class="btn btn-sm" name="action" value="contacts" type="submit">{{ icon('user') }}Beslisser zoeken</button>
+      <button class="btn btn-sm btn-primary" name="action" value="draft" type="submit">{{ icon('send') }}E-mail opstellen</button>
+    </span></div>
+    {% endif %}
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

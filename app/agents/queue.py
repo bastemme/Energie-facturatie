@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.domain.enums import TaskStatus
@@ -23,7 +23,9 @@ def enqueue(db: Session, agent_id: str, task_type: str, payload: dict, *, title:
         raise ValueError(f"Onbekende agent: {agent_id}")
     if spec.task_types and task_type not in spec.task_types:
         raise ValueError(f"{spec.name} accepteert geen taak van type '{task_type}'")
+    number = (db.scalar(select(func.max(AgentTask.number))) or 1000) + 1
     task = AgentTask(
+        number=number,
         agent_id=agent_id, task_type=task_type, title=title[:300], input=payload, priority=max(1, min(9, priority)),
         parent_task_id=parent.id if parent else None,
         workflow_id=workflow_id or (parent.workflow_id if parent else None),

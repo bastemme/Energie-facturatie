@@ -9,6 +9,7 @@ from app.models.agents import (
 )
 from app.models.audit import AuditLog, ProcessingEvent
 from app.models.cases import CaseEvent, RecoveryCase
+from app.models.crm import Contact, InboundMessage, LeadTask, OutreachMessage, ProspectEvent, Suppression
 from app.models.documents import Document, ExtractedValue
 from app.models.energy import Contract, ContractPrice, Invoice, InvoiceLine, MeterReading, ReferenceRate
 from app.models.findings import AnalysisRun, Anomaly
@@ -27,16 +28,22 @@ __all__ = [
     "AuditLog",
     "CaseEvent",
     "Client",
+    "Contact",
     "Contract",
     "ContractPrice",
     "Document",
     "ExtractedValue",
+    "InboundMessage",
     "Invoice",
     "InvoiceLine",
     "Lead",
+    "LeadTask",
     "MeterReading",
+    "OutreachMessage",
     "ProcessingEvent",
+    "ProspectEvent",
     "RecoveryCase",
     "ReferenceRate",
+    "Suppression",
     "User",
 ]

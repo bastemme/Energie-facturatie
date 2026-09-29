@@ -31,6 +31,7 @@ class WebsiteFacts:
     kvk_number: str | None = None
     multi_location: str | None = None
     signals: dict = field(default_factory=dict)
+    text: str = ""  # visible page text (lower case), used for keyword criteria; not stored
 
 
 def domain_of(url: str | None) -> str | None:
@@ -52,6 +53,7 @@ def analyse_html(url: str, final_url: str, status: int, body: str) -> WebsiteFac
     if m := _MULTI.search(text):
         facts.multi_location = " ".join(m.group(1).split())
     facts.signals = {"kvk_on_site": bool(facts.kvk_number), "multi_location": facts.multi_location}
+    facts.text = " ".join(f"{facts.title or ''} {facts.description or ''} {text}".split()).lower()[:60000]
     return facts
 
 

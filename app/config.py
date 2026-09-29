@@ -54,6 +54,26 @@ class Settings(BaseSettings):
     research_max_website_fetches: int = 15
     research_approval_threshold: int = 50  # larger research tasks need a human approval first
     lead_qualify_threshold: int = 55  # fit score from which prospects are handed to the Lead Qualifier
+    contact_max_pages: int = 4  # public pages per company the Contact Researcher may read
+
+    # E-mail provider: "mock" (default; nothing leaves this computer, clearly labelled MOCK) or "smtp" (LIVE:
+    # SMTP for sending, IMAP for reading replies; needs the ER_SMTP_* and ER_IMAP_* settings below).
+    email_provider: str = "mock"
+    inbox_poll_minutes: int = 5  # the agent worker reads the inbox this often (live provider)
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_starttls: bool = True
+    outreach_from_email: str | None = None  # defaults to operator_email
+    outreach_from_name: str = "Team Factuurspoor"
+    follow_up_days: int = 7  # days without a reply before a follow-up draft is proposed
+    # Incoming e-mail (replies). Without ER_IMAP_HOST replies can be registered by hand in the Inbox.
+    imap_host: str | None = None
+    imap_port: int = 993
+    imap_user: str | None = None
+    imap_password: str | None = None
+    imap_folder: str = "INBOX"
 
     # Optional outbound webhook for lead/CRM integration (POST JSON, no invoice data)
     lead_webhook_url: str | None = None

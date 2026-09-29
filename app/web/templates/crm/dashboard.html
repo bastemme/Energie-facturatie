@@ -1,0 +1,73 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% import "_ops.html" as ops with context %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+{% set m = k.money %}
+<div class="page">
+  {% call ui.page_head('Dashboard', 'Van lead tot teruggevorderd geld. Alle cijfers komen uit de database; mogelijke, bevestigde en ontvangen bedragen tellen nooit bij elkaar op.') %}
+    <a class="btn" href="/app/outreach?tab=approval">{{ icon('send') }}E-mails beoordelen{% if nav.approve %} ({{ nav.approve }}){% endif %}</a>
+    <a class="btn btn-primary" href="/app/leads/find">{{ icon('search') }}Leads zoeken</a>
+  {% endcall %}
+
+  {% if k.has_demo %}<div class="alert review">{{ icon('info') }}<span><b>Bevat test- of demodata.</b> {% if k.demo_leads %}{{ k.demo_leads }} leads komen uit de testbron (TESTDATA){% endif %}{% if k.demo_leads and k.demo_clients %} en {% endif %}{% if k.demo_clients %}{{ k.demo_clients }} klant(en) zijn synthetische demo's{% endif %}. Ze tellen mee in de cijfers hieronder en zijn overal gemarkeerd.</span></div>{% endif %}
+
+  <section class="figures" aria-label="Geld">
+    <div class="figure lead recovered"><span class="label"><i class="key positive"></i>Teruggevorderd</span><span class="value">{{ m.recovered|eur }}</span><span class="sub">Daadwerkelijk ontvangen door klanten</span></div>
+    <div class="figure"><span class="label"><i class="key review"></i>Mogelijke terugvordering</span><span class="value">{{ m.potential_discrepancies|eur }}</span><span class="sub">Nog te verifiëren, geen vordering</span></div>
+    <div class="figure"><span class="label"><i class="key brand"></i>Bevestigd</span><span class="value">{{ m.confirmed_discrepancies|eur }}</span><span class="sub">Na beoordeling door een specialist</span></div>
+    <div class="figure"><span class="label"><i class="key"></i>Succesvergoeding</span><span class="value">{{ m.success_fee|eur }}</span><span class="sub">Uitbetaald aan klanten: {{ k.client_payout|eur }}</span></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Pijplijn</h2><a class="small" href="/app/ops">Live in AI Operations {{ icon('arrow-right') }}</a></div>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Totaal leads</th><th>Gekwalificeerd</th><th>E-mails verstuurd</th><th>Positieve reacties</th><th>Gesprekken</th><th>Facturen geanalyseerd</th></tr></thead>
+      <tbody><tr class="kpi-row">
+        <td><a class="primary num" href="/app/leads">{{ k.leads }}</a></td>
+        <td><a class="primary num" href="/app/leads?qualification=good">{{ k.qualified }}</a></td>
+        <td><span class="primary num">{{ k.emails_sent }}</span>{% if k.emails_mock %}<span class="sub">waarvan {{ k.emails_mock }} {{ crm.env(False) }}</span>{% endif %}</td>
+        <td><a class="primary num" href="/app/inbox?show=all">{{ k.positive_responses }}</a></td>
+        <td><a class="primary num" href="/app/leads?stage=MEETING">{{ k.meetings }}</a></td>
+        <td><a class="primary num" href="/app/analyses">{{ k.invoices_analyzed }}</a></td>
+      </tr></tbody>
+    </table></div>
+  </section>
+
+  <div class="grid-3-1">
+    <section class="panel">
+      <div class="panel-head"><div><h2>Van lead tot geld</h2><p>Aantallen per stap. Percentages tonen de doorstroom van de vorige stap.</p></div></div>
+      <div class="panel-body funnel">
+        {% set top = funnel[0].count if funnel[0].count else 1 %}
+        {% for s in funnel %}
+        <a class="f-row" href="{{ s.href }}">
+          <span class="f-label"><b>{{ s.label }}</b><span>{{ s.note }}</span></span>
+          {{ funnel_bar(s.count, [top, s.count]|max, loop.index0) }}
+          <span class="f-n num">{{ s.count }}</span>
+          <span class="f-c num">{% if s.conversion is not none %}{{ (s.conversion * 100)|round|int }}%{% elif not loop.first and funnel[loop.index0 - 1].unit != s.unit %}<span class="muted" data-tip="Andere eenheid dan de vorige stap ({{ s.unit }})" tabindex="0">{{ s.unit }}</span>{% endif %}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><h2>Wacht op u</h2></div>
+        {% if actions %}<ul class="tasklist">{% for a in actions %}<li><a href="{{ a.href }}"><span class="t-icon {{ 'failed' if a.tone == 'critical' else ('waiting' if a.tone == 'review' else '') }}">{{ icon(a.icon) }}</span><span><span class="t-title">{{ a.label }}</span></span><span class="t-side num"><b>{{ a.count }}</b></span></a></li>{% endfor %}</ul>
+        {% else %}<div class="panel-body small muted">{{ icon('check-circle') }} Niets openstaand.</div>{% endif %}
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Recente taken</h2><a class="small" href="/app/ops/tasks">Alle</a></div>
+        {% if tasks %}<ul class="tasklist">{% for t in tasks %}{{ ops.task_row(t, agent_names) }}{% endfor %}</ul>{% else %}<div class="panel-body small muted">Nog geen taken.</div>{% endif %}
+      </section>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Recent bijgewerkte leads</h2><a class="small" href="/app/leads">Alle leads</a></div>
+    {% if recent %}<div class="table-wrap"><table class="table stack-sm"><thead><tr><th>Bedrijf</th><th>Contact</th><th>Status</th><th>Volgende actie</th></tr></thead><tbody>
+    {% for p in recent %}<tr><td><div class="co-cell">{{ crm.co_mono(p.company_name) }}<div><a class="primary" href="/app/leads/{{ p.id }}">{{ p.company_name }}</a><span class="sub">{{ crm.sector_label(p.sector) }}{% if p.city %} · {{ p.city }}{% endif %} {{ crm.testdata(p.is_test_data) }}</span></div></div></td><td data-label="Contact">{{ crm.contact_short(p.primary_contact) }}</td><td data-label="Status">{{ crm.stage(p.stage) }}</td><td data-label="Volgende actie" class="small">{{ p.next_action or '—' }}</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% else %}{% call ui.empty('target', 'Nog geen leads', 'Laat de Lead Researcher echte bedrijven zoeken die in aanmerking komen voor een controle van hun energiefacturen.') %}<a class="btn btn-primary" href="/app/leads/find">Leads zoeken</a>{% endcall %}{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% block title %}Instellingen{% endblock %}
+{% block content %}
+<div class="page">
+  {{ ui.page_head('Instellingen', 'Koppelingen, drempels en de niet-benaderen-lijst. Koppelingen stelt u in via omgevingsvariabelen (.env); wachtwoorden worden hier nooit getoond.') }}
+
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head"><h2>Onderzoeksbron</h2>{{ crm.env(not research.is_test_data) }}</div>
+      <div class="panel-body small stack"><p><b>{{ research.label }}</b></p>{% if research.is_test_data %}<p class="muted">Live onderzoek staat uit: resultaten zijn TESTDATA. Zet <code>ER_RESEARCH_PROVIDER=openstreetmap</code>.</p>{% else %}<p class="muted">Echte bedrijven uit OpenStreetMap (© OpenStreetMap-bijdragers, ODbL) en hun eigen website. Vraagt internettoegang; geen API-sleutel nodig.</p>{% endif %}</div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>E-mail</h2>{{ crm.env(mail.live) }}</div>
+      <div class="panel-body small stack"><p><b>{{ mail.label }}</b> · afzender {{ mail.from }}</p>
+        <p>Verzenden: {% if mail.can_send %}{{ ui.chip('Klaar', 'positive') }}{% else %}{{ ui.chip('Niet ingesteld', 'critical') }}{% endif %} · Mailbox lezen: {% if mail.can_read %}{{ ui.chip('Klaar', 'positive') }}{% else %}{{ ui.chip('Niet ingesteld', 'critical') }}{% endif %}</p>
+        {% if not mail.live %}<p class="muted">MOCK: berichten worden als bestand opgeslagen in <code>data/mock_mail</code> en niet verzonden. Zet <code>ER_EMAIL_PROVIDER=smtp</code> met de SMTP- en IMAP-gegevens om live te gaan.</p>{% endif %}</div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><div><h2>Omgevingsvariabelen</h2><p>Huidige waarden. Aanpassen in het bestand <code>.env</code> en de app opnieuw starten.</p></div></div>
+    <div class="table-wrap"><table class="table table-compact stack-sm"><thead><tr><th>Variabele</th><th>Waarde</th><th>Betekenis</th></tr></thead>
+      <tbody>{% for name, value, meaning in env %}<tr><td><code>{{ name }}</code></td><td data-label="Waarde" class="small">{{ value }}</td><td data-label="Betekenis" class="small muted">{{ meaning }}</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+
+  <section class="panel" id="suppressie">
+    <div class="panel-head"><div><h2>Niet benaderen (suppressielijst)</h2><p>Adressen die gevraagd hebben niet meer benaderd te worden. Ze worden bij opstellen, goedkeuren én verzenden gecontroleerd.</p></div>{{ ui.chip(suppressions|length ~ ' adressen', 'quiet') }}</div>
+    <form class="panel-body row" method="post" action="/app/settings/suppressions">{{ ui.csrf_field() }}<label class="sr-only" for="sp-email">E-mailadres</label><input id="sp-email" name="email" type="email" placeholder="naam@bedrijf.nl" required class="grow"><label class="sr-only" for="sp-reason">Reden</label><input id="sp-reason" name="reason" type="text" placeholder="Reden" class="grow"><button class="btn" type="submit">Toevoegen</button></form>
+    {% if suppressions %}<div class="table-wrap"><table class="table table-compact"><thead><tr><th>Adres</th><th>Reden</th><th>Sinds</th></tr></thead><tbody>{% for s in suppressions %}<tr><td>{{ s.email }}</td><td class="small">{{ s.reason }}{% if s.source == 'reply' %} {{ ui.chip('via e-mail', 'quiet') }}{% endif %}</td><td class="small num">{{ s.created_at|d }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  </section>
+
+  <section class="panel panel-pad row">
+    <a class="btn" href="/app/users">{{ icon('users') }}Gebruikers</a>
+    <a class="btn" href="/app/reference-rates">{{ icon('rate') }}Referentietarieven</a>
+    <a class="btn" href="/app/audit">{{ icon('audit') }}Auditlog</a>
+    <a class="btn" href="/app/designsysteem">{{ icon('design') }}Designsysteem</a>
+  </section>
+</div>
+{% endblock %}

@@ -57,7 +57,7 @@ An agent asks the workflow for the next stage, so agents don't hard-code their s
 | Group | Agents | Status |
 |---|---|---|
 | Coördinatie | Orchestrator, QA, Analytics | Defined |
-| Acquisitie | **Lead Researcher**, Lead Qualifier, Contact Researcher, Outreach, Email, Follow-up | Lead Researcher is working. The rest are defined. |
+| Acquisitie | Lead Researcher, Lead Qualifier, Contact Researcher, Outreach, Email, Follow-up | **All six working** (see below) |
 | Facturen | Invoice Intake, Invoice Analysis, Audit | Defined. The existing ingestion and detection services are their future tools. |
 | Terugvordering | Recovery, Claims, Customer Success, Finance | Defined |
 
@@ -104,3 +104,43 @@ existing tables (`add_missing_columns`), so existing SQLite databases keep worki
    uses the database.
 3. Register it in `registry._implementations()`.
 4. Add tests next to `tests/test_agents.py`.
+
+
+## Operational workflow: lead → approved outreach → reply
+
+```
+Leads zoeken (UI)
+  → Lead Researcher     OpenStreetMap + company website; saves Prospect (lead) with evidence + "why relevant" (sourced)
+  → Lead Qualifier      fixed rules (fit score, chain branch, locations, inbound request) → STRONG/GOOD/WEAK/UNQUALIFIED
+  → Contact Researcher  reads the company's own contact/team/about pages; stores Contact only if the page states it
+  → Outreach            Dutch e-mail from a template, only stored facts (≤150 words) → OutreachMessage PENDING_APPROVAL
+  → HUMAN               Outreach → Wacht op goedkeuring: edit / reject (reason required) / approve  → APPROVED
+  → Email               EmailProvider.send_email (LIVE smtp or MOCK); status SENT, lead → CONTACTED
+  → reply arrives       EmailProvider.get_inbox (IMAP, or the MOCK mailbox); linked by In-Reply-To, then address/domain
+  → Email               rule-based classification → lead stage, next action, LeadTask, reply draft (again for approval)
+                        UNSUBSCRIBE → address on the suppression list, contact/lead DO NOT CONTACT, open drafts withdrawn
+```
+
+Traceability (all foreign keys): `Prospect` (company + lead pipeline fields) → `Contact` (source URL + excerpt +
+confidence) → `OutreachMessage` (the e-mail; `decided_by_id`, `delivery` live/mock, `delivery_ref` = Message-ID) →
+`InboundMessage` (the conversation; `outreach_id`, category + reasons) → `LeadTask` (e.g. plan the meeting).
+Every step also writes a `ProspectEvent` (timeline, shown in AI Operations as *Live activiteit*) and runs as an
+`AgentTask` with `AgentLog` entries; human send approvals are also stored as `AgentApproval`.
+
+### Nothing is fabricated
+
+- Missing data is shown as ONBEKEND (unknown), never guessed. Energy consumption is always unknown until invoices
+  are analysed; "why relevant" statements are industry traits or facts found on a page, each with its source.
+- Contacts: only names/roles/e-mails present on the company's own pages (same domain). No e-mail patterns are
+  constructed. Generic addresses (info@, contact@, …) are marked `GENERAL_COMPANY_EMAIL`. LinkedIn only when the
+  company page links to the profile. If nothing is found: "Contact niet gevonden".
+- MOCK vs LIVE is shown on every relevant screen. The research test source (`ER_RESEARCH_PROVIDER=mock`) marks
+  every record TESTDATA with `.example` domains.
+
+### E-mail provider
+
+`app/integrations/email/provider.py`: `EmailProvider` with `send_email`, `get_inbox`, `get_message`,
+`reply_to_message`. Adapters: `SmtpImapProvider` (LIVE) and `MockEmailProvider` (MOCK, files in
+`data/mock_mail`). Choose with `ER_EMAIL_PROVIDER`. A live provider without configuration fails with a message
+naming the missing variables; it never falls back to the mock. The web app (and `python -m app.cli agents
+worker`) reads a live mailbox every `ER_INBOX_POLL_MINUTES`.

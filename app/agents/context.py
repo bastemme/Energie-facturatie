@@ -63,6 +63,18 @@ class ExecutionContext:
         self.buffered_logs.append(entry)
         live.append(self.task.id, live.LiveEntry(entry.created_at, event, entry.message, level, data, duration_ms))
 
+    def progress(self, done: int, total: int) -> None:
+        """Report progress (e.g. 18 / 25). Visible live in this process; stored on the task when it ends."""
+        self.task.progress_done, self.task.progress_total = done, total
+        live.set_progress(self.task.id, done, total)
+
+    def event(self, prospect_id: str, kind: str, message: str, data: dict | None = None) -> None:
+        """Add an entry to a lead's timeline, attributed to this agent and task."""
+        from app.models import ProspectEvent
+
+        self.db.add(ProspectEvent(prospect_id=prospect_id, kind=kind, message=message[:1000], agent_id=self.agent.id,
+                                  task_id=self.task.id, data=data))
+
     def require(self, permission: str) -> None:
         try:
             require(self.agent.permissions, permission)
@@ -147,11 +159,16 @@ class ExecutionContext:
 
 
 def _safe_args(kwargs: dict) -> dict:
+    """Loggable view of tool arguments: no message bodies, e-mail addresses masked, objects by type."""
     out = {}
     for k, v in kwargs.items():
         if k == "db":
             continue
-        if isinstance(v, str | int | float | bool) or v is None:
+        if k in ("body", "excerpt", "personalization"):
+            out[k] = f"<{len(v)} tekens>" if isinstance(v, str) else "<…>"
+        elif isinstance(v, str) and "@" in v:
+            out[k] = "…@" + v.split("@", 1)[1][:100]
+        elif isinstance(v, str | int | float | bool) or v is None:
             out[k] = v if not isinstance(v, str) else v[:200]
         elif isinstance(v, list | tuple):
             out[k] = [str(x)[:80] for x in v][:10]

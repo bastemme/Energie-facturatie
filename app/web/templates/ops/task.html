@@ -4,7 +4,7 @@
 {% block content %}
 {% set out = task.output or {} %}
 <div class="page"{% if pulse %} data-pulse="/app/ops/pulse" data-pulse-v="{{ pulse }}"{% endif %}>
-  {% call ui.page_head(task.title, agent.name ~ ' · aangemaakt ' ~ (task.created_at|ago) ~ (' door ' ~ names.get(task.created_by_agent_id) if task.created_by_agent_id else ''), [('AI Operations', '/app/ops'), (agent.name, '/app/ops/agents/' ~ agent.id)]) %}
+  {% call ui.page_head(('#' ~ task.number ~ ' · ' if task.number else '') ~ task.title, agent.name ~ ' · aangemaakt ' ~ (task.created_at|ago) ~ (' door ' ~ names.get(task.created_by_agent_id) if task.created_by_agent_id else ''), [('AI Operations', '/app/ops'), (agent.name, '/app/ops/agents/' ~ agent.id)]) %}
     {{ ops.task_chip(task.status) }}
     {% if task.is_open %}<form method="post" action="/app/ops/tasks/{{ task.id }}/cancel" class="inline">{{ ui.csrf_field() }}<button class="btn btn-danger" type="submit">Annuleren</button></form>{% endif %}
     {% if task.status.value in ('FAILED','CANCELLED') %}<form method="post" action="/app/ops/tasks/{{ task.id }}/retry" class="inline">{{ ui.csrf_field() }}<button class="btn btn-primary" type="submit">{{ icon('play') }}Opnieuw proberen</button></form>{% endif %}
@@ -13,12 +13,18 @@
   {% if workflow %}<div class="wf" aria-label="Workflow {{ workflow.name }}">{% set here = namespace(seen=false) %}{% for st in workflow.stages %}{% set is_here = st.agent_id == task.agent_id %}<span class="{{ 'here' if is_here else ('done' if not here.seen else '') }}">{{ st.label }}{% if st.needs_approval %} {{ icon('shield') }}{% endif %}</span>{% if is_here %}{% set here.seen = true %}{% endif %}{% endfor %}</div>{% endif %}
 
   {% if task.status.value == 'QUEUED' and not agent.implemented %}<div class="alert info">{{ icon('clock') }}<span><b>Deze taak wacht op {{ agent.name }}.</b> Die agent is nog niet gebouwd; de overdracht en de gegevens staan klaar.</span></div>{% endif %}
+  {% set prog = live_progress(task) %}{% set nxt = workflow.next_stage(task.agent_id) if workflow else none %}
   {% if task.status.value == 'RUNNING' %}<div class="alert info">{{ icon('settings') }}<span><b>{{ agent.name }} is bezig.</b> Deze pagina werkt zichzelf bij.</span></div>{% endif %}
+  {% if prog or nxt %}<section class="panel panel-pad stack">
+    <div class="row-between"><span class="small"><span class="muted">Toegewezen aan</span> <b>{{ agent.name }}</b></span>{% if nxt %}<span class="small"><span class="muted">Daarna</span> <b>{{ names.get(nxt.agent_id, nxt.agent_id) }}</b>{% if nxt.needs_approval %} · na uw goedkeuring{% endif %}</span>{% endif %}</div>
+    {% if prog %}<div class="progress-line">{{ progress_bar(prog[0], prog[1], 'done' if task.status.value == 'COMPLETED' else '') }}<span>{{ prog[0] }} / {{ prog[1] }}</span></div>{% endif %}
+  </section>{% endif %}
   {% if task.status.value == 'FAILED' %}<div class="alert critical">{{ icon('alert') }}<span><b>De taak is mislukt.</b> {{ task.error }}</span></div>{% endif %}
   {% if task.status.value == 'QUEUED' and task.error %}<div class="alert review">{{ icon('clock') }}<span><b>Tijdelijke fout, er volgt automatisch een nieuwe poging.</b> {{ task.error }}</span></div>{% endif %}
   {% for a in approvals if a.status.value == 'PENDING' %}<section class="panel">{{ ops.approval_card(a, names, '/app/ops/tasks/' ~ task.id) }}</section>{% endfor %}
 
-  {% if out.summary %}
+  {% if out.summary and out.found is not defined %}<div class="alert {{ 'positive' if task.status.value == 'COMPLETED' else 'info' }}">{{ icon('check-circle') }}<span><b>Resultaat:</b> {{ out.summary }}</span></div>{% endif %}
+  {% if out.summary and out.found is defined %}
   <section class="figures" aria-label="Resultaat">
     <div class="figure lead"><span class="label">Resultaat</span><span class="value">{{ out.saved if out.saved is defined else '—' }}</span><span class="sub">{{ out.summary }}</span></div>
     {% if out.found is defined %}
@@ -36,7 +42,7 @@
     <div class="table-wrap"><table class="table stack-sm">
       <thead><tr><th>Bedrijf</th><th>Sector</th><th>Plaats</th><th>Signalen</th><th class="r">Fitscore</th></tr></thead>
       <tbody>{% for p in prospects %}<tr>
-        <td><a class="primary" href="/app/ops/prospects/{{ p.id }}">{{ p.company_name }}</a>{% if p.website %}<span class="sub">{{ p.domain }}</span>{% endif %}</td>
+        <td><a class="primary" href="/app/leads/{{ p.id }}">{{ p.company_name }}</a>{% if p.website %}<span class="sub">{{ p.domain }}</span>{% endif %}</td>
         <td data-label="Sector">{{ sectors[p.sector].label if p.sector in sectors else p.sector }}</td>
         <td data-label="Plaats">{{ p.city or '—' }}</td>
         <td data-label="Signalen" class="small">{% if p.is_test_data %}<span class="testdata">TESTDATA</span> {% endif %}{% if p.kvk_number %}{{ ui.chip('KvK', 'neutral') }} {% endif %}{% if p.signals and p.signals.multi_location %}{{ ui.chip('Meerdere locaties', 'brand') }} {% endif %}{% if p.brand %}{{ ui.chip('Filiaal', 'quiet') }}{% endif %}</td>

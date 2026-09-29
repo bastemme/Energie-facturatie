@@ -43,35 +43,43 @@ AGENTS: list[AgentSpec] = [
     AgentSpec(
         "lead_qualifier", "Lead Qualifier", "Beoordeelt onderzochte bedrijven op geschiktheid: omvang, "
         "energieprofiel, beslisstructuur.", "Kwalificatie van prospects", "Acquisitie",
-        _i("Beoordeel onderzochte bedrijven met de kwalificatiecriteria en markeer ze als gekwalificeerd of "
-           "afgewezen, met reden. Gekwalificeerde bedrijven gaan naar de Contact Researcher."),
-        ("prospects.read", "prospects.write", "web.search", "web.fetch", "tasks.handoff", "context.read"),
-        ("prospects.find_duplicate", "kvk.lookup", "web.fetch_website"), ("qualify_prospects",)),
+        _i("Beoordeel onderzochte bedrijven met vaste kwalificatieregels (fitscore, keten of zelfstandig, omvang, "
+           "bereikbaarheid) en leg per bedrijf de redenen vast. Sterke en goede leads gaan naar de Contact "
+           "Researcher."),
+        ("prospects.read", "prospects.write", "leads.write", "tasks.handoff", "context.read"),
+        ("prospects.load", "prospects.qualify"), ("qualify_prospects",), version="1.0"),
     AgentSpec(
-        "contact_researcher", "Contact Researcher", "Zoekt het juiste zakelijke contactpunt (bijv. financieel of "
-        "facilitair) bij gekwalificeerde bedrijven.", "Contactonderzoek", "Acquisitie",
-        _i("Zoek uitsluitend zakelijke contactpunten in openbare bedrijfsbronnen, met vastgelegde grondslag "
-           "(gerechtvaardigd belang) en bron. Geen privé-gegevens."),
+        "contact_researcher", "Contact Researcher", "Zoekt de beslisser (energie, inkoop, facilitair, financieel) "
+        "op de openbare website van gekwalificeerde bedrijven.", "Contactonderzoek", "Acquisitie",
+        _i("Lees alleen openbare bedrijfspagina's (contact, over ons, team). Leg een contact alleen vast als de "
+           "pagina zelf naam en functie of een zakelijk e-mailadres noemt, met URL en de letterlijke tekst als bron. "
+           "Construeer nooit e-mailadressen en vul nooit namen aan."),
         ("prospects.read", "contacts.research", "web.fetch", "tasks.handoff"),
-        ("contacts.find_business_contact", "web.fetch_website"), ("find_contacts",)),
+        ("prospects.load", "web.find_contacts", "contacts.save"), ("find_contacts",), version="1.0"),
     AgentSpec(
-        "outreach", "Outreach", "Stelt per bedrijf een relevante, feitelijke eerste benadering op.",
+        "outreach", "Outreach", "Stelt per bedrijf een korte, feitelijke eerste e-mail op, klaar voor goedkeuring.",
         "Benaderingsstrategie", "Acquisitie",
-        _i("Schrijf korte, feitelijke berichten zonder beloftes over bedragen. Nooit versturen: dat doet de "
-           "Email-agent na goedkeuring."),
-        ("prospects.read", "leads.read", "outreach.draft", "tasks.handoff"), ("outreach.draft_message",),
-        ("draft_outreach",)),
+        _i("Schrijf korte, feitelijke berichten zonder beloftes over bedragen, alleen met feiten die zijn "
+           "vastgelegd. Nooit versturen: een medewerker keurt goed, daarna verstuurt de Email-agent."),
+        ("prospects.read", "leads.read", "outreach.draft"), ("prospects.load", "outreach.draft_message"),
+        ("draft_outreach",), version="1.0"),
     AgentSpec(
-        "email", "Email", "Verstuurt goedgekeurde berichten en verwerkt antwoorden.", "E-mailafhandeling",
-        "Acquisitie", _i("Verstuur alleen berichten waarvoor een medewerker goedkeuring heeft gegeven. Respecteer "
-                         "afmeldingen direct."),
-        ("leads.read", "email.send", "tasks.handoff"), ("email.send",), ("send_email",),
-        approval_actions=("email.send",)),
+        "email", "Email", "Verstuurt goedgekeurde berichten, leest de mailbox en classificeert antwoorden.",
+        "E-mailafhandeling", "Acquisitie",
+        _i("Verstuur alleen berichten waarvoor een medewerker goedkeuring heeft gegeven. Classificeer antwoorden met "
+           "de vaste regels, werk de leadstatus bij en stel een antwoord op ter goedkeuring. Respecteer afmeldingen "
+           "direct. Verstuur nooit automatisch een antwoord."),
+        ("leads.read", "leads.write", "email.send", "email.read", "outreach.draft"),
+        ("outreach.load_message", "email.send", "inbox.fetch", "inbox.register", "email.classify_reply",
+         "leads.apply_reply", "outreach.draft_message"),
+        ("send_email", "classify_reply", "fetch_inbox"), approval_actions=("email.send",), version="1.0"),
     AgentSpec(
-        "follow_up", "Follow-up", "Plant opvolging van benaderde bedrijven en leads.", "Opvolging", "Acquisitie",
-        _i("Plan maximaal twee opvolgmomenten; stop direct bij een afmelding of een nee."),
-        ("leads.read", "leads.write", "outreach.draft", "tasks.create", "tasks.handoff"),
-        ("outreach.draft_message", "tasks.create"), ("schedule_follow_up",)),
+        "follow_up", "Follow-up", "Stelt een opvolgbericht op als een verstuurde e-mail onbeantwoord blijft.",
+        "Opvolging", "Acquisitie",
+        _i("Stel maximaal één opvolgbericht per eerste e-mail op, pas na de ingestelde wachttijd, en nooit bij een "
+           "afmelding, een nee of een lopend gesprek. Ook opvolging wordt eerst goedgekeurd."),
+        ("leads.read", "outreach.draft"), ("outreach.find_unanswered", "outreach.draft_message"),
+        ("schedule_follow_up",), version="1.0"),
     AgentSpec(
         "invoice_intake", "Invoice Intake", "Neemt aangeleverde documenten in ontvangst en zorgt dat ze correct "
         "worden uitgelezen.", "Documentintake", "Facturen",

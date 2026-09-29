@@ -39,6 +39,13 @@ def use_impls(monkeypatch, db, impls):
     registry.sync_agents(db)
 
 
+def solo(db, agent_id="lead_researcher"):
+    """Only `agent_id` takes work, so a test can look at one stage without the next stages running."""
+    for rec in db.scalars(select(AgentRecord)):
+        rec.enabled = rec.id == agent_id
+    db.commit()
+
+
 def run_one(db):
     task = claim_next(db)
     assert task is not None, "no runnable task"
@@ -66,7 +73,8 @@ def test_sync_agents_registers_all_16_and_keeps_runtime_state(agents):
     db = agents
     rows = db.scalars(select(AgentRecord)).all()
     assert len(rows) == 16
-    assert {r.id for r in rows if r.implemented} == {"lead_researcher"}
+    assert {r.id for r in rows if r.implemented} == {"lead_researcher", "lead_qualifier", "contact_researcher",
+                                                     "outreach", "email", "follow_up"}
     rec = db.get(AgentRecord, "email")
     rec.enabled = False
     db.commit()
@@ -84,7 +92,7 @@ def test_enqueue_validates_agent_and_task_type(agents):
 
 def test_claim_respects_priority_readiness_and_implementation(agents):
     db = agents
-    enqueue(db, "lead_qualifier", "qualify_prospects", {}, title="not built", priority=9)
+    enqueue(db, "invoice_intake", "intake_documents", {}, title="not built", priority=9)
     low = enqueue(db, "lead_researcher", "research_prospects", {}, title="low", priority=2)
     later = enqueue(db, "lead_researcher", "research_prospects", {}, title="later", priority=9)
     later.not_before = utcnow() + timedelta(minutes=5)
@@ -151,6 +159,7 @@ def test_lead_researcher_end_to_end_with_test_provider(agents):
 
 def test_lead_researcher_skips_known_companies_on_rerun(agents):
     db = agents
+    solo(db)
     first = research(db)
     run_one(db)
     db.refresh(first)
@@ -168,7 +177,7 @@ def test_lead_researcher_rejects_invalid_input(agents):
     db = agents
     task = research(db, sectors=["unknown"])
     run_one(db)
-    assert task.status == TaskStatus.FAILED and "sector" in task.error
+    assert task.status == TaskStatus.FAILED and "branche" in task.error
     assert db.get(AgentRecord, "lead_researcher").status == AgentStatus.FAILED
 
 
@@ -186,6 +195,7 @@ def test_score_is_explained_component_by_component():
 
 def test_large_research_waits_for_approval_then_resumes(agents, staff):
     db = agents
+    solo(db)
     task = research(db, limit=40)
     run_one(db)
     assert task.status == TaskStatus.WAITING_APPROVAL
@@ -205,6 +215,7 @@ def test_large_research_waits_for_approval_then_resumes(agents, staff):
 
 def test_rejected_approval_cancels_task(agents, staff):
     db = agents
+    solo(db)
     task = research(db, limit=40)
     run_one(db)
     approval = db.scalar(select(AgentApproval).where(AgentApproval.task_id == task.id))

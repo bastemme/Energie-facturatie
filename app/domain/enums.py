@@ -142,6 +142,7 @@ class CaseStatus(StrEnum):
     DETECTED = "DETECTED"
     REVIEW = "REVIEW"
     VERIFIED = "VERIFIED"
+    CLAIM_PREPARED = "CLAIM_PREPARED"
     CLIENT_APPROVAL = "CLIENT_APPROVAL"
     SUBMITTED = "SUBMITTED"
     SUPPLIER_REVIEW = "SUPPLIER_REVIEW"
@@ -192,8 +193,64 @@ class ApprovalStatus(StrEnum):
 
 
 class ProspectStatus(StrEnum):
+    """Legacy research status (kept for existing rows); the CRM pipeline uses LeadStage."""
+
     RESEARCHED = "RESEARCHED"
     QUALIFIED = "QUALIFIED"
     DISQUALIFIED = "DISQUALIFIED"
     CONTACTED = "CONTACTED"
     CONVERTED = "CONVERTED"
+
+
+class LeadStage(StrEnum):
+    """CRM pipeline stage of a lead (a company in the outbound or inbound pipeline)."""
+
+    NEW = "NEW"
+    RESEARCHING = "RESEARCHING"
+    QUALIFIED = "QUALIFIED"
+    CONTACTED = "CONTACTED"
+    RESPONDED = "RESPONDED"
+    MEETING = "MEETING"
+    PILOT = "PILOT"
+    CUSTOMER = "CUSTOMER"
+    REJECTED = "REJECTED"
+
+    @property
+    def rank(self) -> int:
+        return list(LeadStage).index(self)
+
+
+class Qualification(StrEnum):
+    STRONG = "STRONG"
+    GOOD = "GOOD"
+    WEAK = "WEAK"
+    UNQUALIFIED = "UNQUALIFIED"
+
+
+class OutreachStatus(StrEnum):
+    DRAFT = "DRAFT"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    APPROVED = "APPROVED"  # a named person approved it; the Email agent may send it
+    SCHEDULED = "SCHEDULED"  # approved, waiting for a send time (not used yet)
+    SENT = "SENT"  # handed to the e-mail provider (see OutreachMessage.delivery: live or mock)
+    OUTBOX = "OUTBOX"  # legacy: saved locally, not sent
+    FAILED = "FAILED"
+    REJECTED = "REJECTED"
+
+
+class OutreachKind(StrEnum):
+    INITIAL = "INITIAL"
+    FOLLOW_UP = "FOLLOW_UP"
+    REPLY = "REPLY"
+
+
+class ReplyCategory(StrEnum):
+    INTERESTED = "INTERESTED"
+    MEETING_REQUEST = "MEETING_REQUEST"
+    MORE_INFORMATION = "MORE_INFORMATION"
+    NOT_INTERESTED = "NOT_INTERESTED"
+    WRONG_PERSON = "WRONG_PERSON"
+    FOLLOW_UP = "FOLLOW_UP"
+    UNSUBSCRIBE = "UNSUBSCRIBE"
+    OUT_OF_OFFICE = "OUT_OF_OFFICE"
+    OTHER = "OTHER"

@@ -1,0 +1,18 @@
+{% extends "app_base.html" %}
+{% import "_ops.html" as ops with context %}
+{% block title %}Taken{% endblock %}
+{% block content %}
+{% set TASK_NL = {'QUEUED':'In wachtrij','RUNNING':'Bezig','WAITING_APPROVAL':'Wacht op goedkeuring','COMPLETED':'Afgerond','FAILED':'Mislukt','CANCELLED':'Geannuleerd'} %}
+<div class="page" data-pulse="/app/ops/pulse" data-pulse-v="{{ pulse }}">
+  {{ ui.page_head('Taken', 'Alle opdrachten aan agents: wie ze uitvoert, de voortgang en wat er daarna gebeurt.', [('AI Operations', '/app/ops')]) }}
+  <nav class="seg" aria-label="Status">
+    <a href="/app/ops/tasks{{ '?agent=' ~ agent if agent }}"{% if not status %} aria-current="page"{% endif %}>Alle</a>
+    {% for st, label in TASK_NL.items() %}{% set n = counts.get(st, 0) %}{% if n %}<a href="/app/ops/tasks?status={{ st }}{{ '&agent=' ~ agent if agent }}"{% if status == st %} aria-current="page"{% endif %}>{{ label }} <span class="n">{{ n }}</span></a>{% endif %}{% endfor %}
+  </nav>
+  <form class="filters" method="get" action="/app/ops/tasks">{% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}<label class="sr-only" for="ag">Agent</label><select id="ag" name="agent"><option value="">Alle agents</option>{% for a in agents %}<option value="{{ a.id }}"{% if agent == a.id %} selected{% endif %}>{{ a.name }}</option>{% endfor %}</select><button class="btn" type="submit">Filteren</button></form>
+  <section class="panel">
+    {% if tasks %}<ul class="tasklist">{% for t in tasks %}{{ ops.task_row(t, names) }}{% endfor %}</ul>
+    {% else %}{{ ui.empty('clock', 'Geen taken', 'Taken verschijnen hier zodra u leads zoekt of een agent iets laat doen.') }}{% endif %}
+  </section>
+</div>
+{% endblock %}

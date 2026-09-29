@@ -13,29 +13,33 @@
 </head>
 <body>
 {% if user %}
-{% macro navlink(href, label, ico, match=None, count=None, attention=False) %}{% set m = match or href %}<a href="{{ href }}"{% if path == href or (m != '/app' and path.startswith(m)) %} aria-current="page"{% endif %}>{{ icon(ico) }}{{ label }}{% if count %}<span class="count{{ ' attention' if attention }}">{{ count }}</span>{% endif %}</a>{% endmacro %}
+{% macro navlink(href, label, ico, match=None, count=None, attention=False) %}{% set m = match or href %}<a href="{{ href }}"{% if path == href or (m != '/app' and path.startswith(m)) or path.startswith(NAV_ALIASES.get(href, ('~',))) %} aria-current="page"{% endif %}>{{ icon(ico) }}{{ label }}{% if count %}<span class="count{{ ' attention' if attention }}">{{ count }}</span>{% endif %}</a>{% endmacro %}
 <div class="shell">
   <aside class="sidebar" aria-label="Hoofdnavigatie">
     <a class="logo" href="/app">{{ LOGO }}<span>{{ operator_name }}</span></a>
     <nav class="nav">
       {% if user.is_staff %}
       <div class="nav-group">
-        {{ navlink('/app/admin', 'Overzicht', 'overview') }}
-        {{ navlink('/app/review', 'Beoordelen', 'review', count=queue_count, attention=queue_count > 0) }}
+        {{ navlink('/app/dashboard', 'Dashboard', 'overview') }}
+      </div>
+      <div class="nav-group">
+        <span class="nav-title">Sales</span>
+        {{ navlink('/app/leads', 'Leads', 'target') }}
+        {{ navlink('/app/companies', 'Bedrijven', 'clients') }}
+        {{ navlink('/app/contacts', 'Contacten', 'users') }}
+        {{ navlink('/app/outreach', 'Outreach', 'send', count=nav.approve, attention=nav.approve > 0) }}
+        {{ navlink('/app/inbox', 'Inbox', 'inbox', count=nav.inbox, attention=nav.inbox > 0) }}
+      </div>
+      <div class="nav-group">
+        <span class="nav-title">Terugvordering</span>
+        {{ navlink('/app/clients', 'Klanten & facturen', 'invoice') }}
+        {{ navlink('/app/analyses', 'Analyses', 'review', count=nav.review, attention=nav.review > 0) }}
         {{ navlink('/app/cases', 'Dossiers', 'cases') }}
-        {{ navlink('/app/clients', 'Klanten', 'clients') }}
       </div>
       <div class="nav-group">
-        <span class="nav-title">AI Operations</span>
-        {{ navlink('/app/ops', 'Command center', 'bolt', match='/app/ops/agents') }}
-        {{ navlink('/app/ops/prospects', 'Onderzochte bedrijven', 'search') }}
-        {{ navlink('/app/leads', 'Leads', 'leads') }}
-      </div>
-      <div class="nav-group">
-        <span class="nav-title">Beheer</span>
-        {{ navlink('/app/reference-rates', 'Referentietarieven', 'rate') }}
-        {% if user.role.value == 'ADMIN' %}{{ navlink('/app/users', 'Gebruikers', 'users') }}{{ navlink('/app/audit', 'Auditlog', 'audit') }}{% endif %}
-        {{ navlink('/app/designsysteem', 'Designsysteem', 'design') }}
+        <span class="nav-title">Platform</span>
+        {{ navlink('/app/ops', 'AI Operations', 'bolt', count=nav.ops, attention=nav.ops > 0) }}
+        {{ navlink('/app/settings', 'Instellingen', 'settings') }}
       </div>
       {% else %}
       <div class="nav-group">

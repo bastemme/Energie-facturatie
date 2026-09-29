@@ -16,10 +16,11 @@ from app.agents.runner import kick
 from app.agents.tools import all_tools
 from app.config import get_settings
 from app.db import get_db
-from app.domain.enums import ProspectStatus, TaskStatus
+from app.domain.enums import TaskStatus
+from app.integrations.email.provider import provider_status
 from app.integrations.web.research import get_research_provider
 from app.models import AgentApproval, AgentLog, AgentMessage, AgentRecord, AgentTask, Prospect, User
-from app.services.agent_ops import agent_state, dashboard, pulse
+from app.services.agent_ops import activity, agent_state, dashboard, pipeline, pulse
 from app.services.audit import audit
 from app.web.deps import client_ip, flash, redirect, render
 from app.web.security import require_admin, require_staff, verify_csrf
@@ -35,7 +36,8 @@ def _schedule(background: BackgroundTasks) -> None:
 
 @router.get("/app/ops")
 def ops_dashboard(request: Request, user: User = Depends(require_staff), db: Session = Depends(get_db)):
-    return render(request, "ops/dashboard.html", user=user, d=dashboard(db), pulse=pulse(db))
+    return render(request, "ops/dashboard.html", user=user, d=dashboard(db), pulse=pulse(db), pipeline=pipeline(db),
+                  activity=activity(db), mail=provider_status(), research=get_research_provider())
 
 
 @router.get("/app/ops/pulse")
@@ -88,6 +90,22 @@ def agent_toggle(agent_id: str, request: Request, user: User = Depends(require_a
 
 
 # ---------------------------------------------------------------- tasks
+
+
+@router.get("/app/ops/tasks")
+def tasks_list(request: Request, status: str = "", agent: str = "", user: User = Depends(require_staff),
+               db: Session = Depends(get_db)):
+    q = select(AgentTask).order_by(AgentTask.created_at.desc())
+    if status in TaskStatus.__members__:
+        q = q.where(AgentTask.status == TaskStatus(status))
+    if agent:
+        q = q.where(AgentTask.agent_id == agent)
+    tasks = db.scalars(q.limit(300)).all()
+    counts = dict(db.execute(select(AgentTask.status, func.count()).group_by(AgentTask.status)).all())
+    agents = db.scalars(select(AgentRecord).where(AgentRecord.implemented.is_(True))).all()
+    return render(request, "ops/tasks.html", user=user, tasks=tasks, counts=counts, status=status, agent=agent,
+                  agents=agents, names={a.id: a.name for a in db.scalars(select(AgentRecord)).all()},
+                  pulse=pulse(db))
 
 
 @router.get("/app/ops/tasks/{task_id}")
@@ -174,11 +192,8 @@ def approval_decide(approval_id: str, request: Request, background: BackgroundTa
 
 
 @router.get("/app/ops/research/new")
-def research_new(request: Request, user: User = Depends(require_staff)):
-    provider = get_research_provider()
-    return render(request, "ops/research_new.html", user=user, sectors=SECTORS.values(), provider=provider,
-                  max_limit=MAX_LIMIT, threshold=get_settings().research_approval_threshold,
-                  qualify=get_settings().lead_qualify_threshold)
+def research_new(user: User = Depends(require_staff)):
+    return redirect("/app/leads/find")
 
 
 @router.post("/app/ops/research", dependencies=[Depends(verify_csrf)])
@@ -217,28 +232,10 @@ async def research_create(request: Request, background: BackgroundTasks, user: U
 
 
 @router.get("/app/ops/prospects")
-def prospects_list(request: Request, status: str = "", sector: str = "", user: User = Depends(require_staff),
-                   db: Session = Depends(get_db)):
-    q = select(Prospect).order_by(Prospect.fit_score.desc(), Prospect.created_at.desc())
-    if status in ProspectStatus.__members__:
-        q = q.where(Prospect.status == ProspectStatus(status))
-    if sector in SECTORS:
-        q = q.where(Prospect.sector == sector)
-    prospects = db.scalars(q.limit(500)).all()
-    return render(request, "ops/prospects.html", user=user, prospects=prospects, sectors=SECTORS,
-                  filters={"status": status, "sector": sector}, qualify=get_settings().lead_qualify_threshold,
-                  total=db.scalar(select(func.count()).select_from(Prospect)) or 0)
+def prospects_list(user: User = Depends(require_staff)):
+    return redirect("/app/leads")
 
 
 @router.get("/app/ops/prospects/{prospect_id}")
-def prospect_detail(prospect_id: str, request: Request, user: User = Depends(require_staff),
-                    db: Session = Depends(get_db)):
-    p = db.get(Prospect, prospect_id)
-    if p is None:
-        raise HTTPException(status_code=404)
-    return render(request, "ops/prospect.html", user=user, p=p, sector=SECTORS.get(p.sector),
-                  task=db.get(AgentTask, p.research_task_id) if p.research_task_id else None,
-                  qualify=get_settings().lead_qualify_threshold)
-
-
-
+def prospect_detail(prospect_id: str, user: User = Depends(require_staff)):
+    return redirect(f"/app/leads/{prospect_id}")

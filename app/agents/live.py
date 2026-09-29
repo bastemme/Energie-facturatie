@@ -45,6 +45,20 @@ def total() -> int:
         return sum(len(v) for v in _entries.values())
 
 
+_progress: dict[str, tuple[int, int]] = {}
+
+
+def set_progress(task_id: str, done: int, total: int) -> None:
+    with _lock:
+        _progress[task_id] = (done, total)
+
+
+def progress(task_id: str) -> tuple[int, int] | None:
+    with _lock:
+        return _progress.get(task_id)
+
+
 def clear(task_id: str) -> None:
     with _lock:
         _entries.pop(task_id, None)
+        _progress.pop(task_id, None)

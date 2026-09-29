@@ -162,9 +162,21 @@ def cmd_agents(args) -> None:
     if args.action == "run":
         print(f"{run_pending(max_tasks=args.max)} taak/taken verwerkt.")
         return
-    print(f"Agent-worker gestart; controleert de wachtrij elke {args.interval} s. Stoppen: Ctrl+C.")
+    from app.agents.queue import enqueue
+    from app.config import get_settings
+    from app.integrations.email.provider import get_email_provider, provider_status
+
+    poll = get_settings().inbox_poll_minutes * 60
+    live_inbox = get_email_provider().is_live and provider_status()["can_read"]
+    print(f"Agent-worker gestart; controleert de wachtrij elke {args.interval} s"
+          + (f" en de mailbox elke {poll // 60} min" if live_inbox else "") + ". Stoppen: Ctrl+C.")
+    last_poll = 0.0
     try:
         while True:
+            if live_inbox and time.monotonic() - last_poll >= poll:
+                with session_scope() as db:
+                    enqueue(db, "email", "fetch_inbox", {}, title="Mailbox lezen (automatisch)", priority=4)
+                last_poll = time.monotonic()
             if done := run_pending(max_tasks=args.max):
                 print(f"{done} taak/taken verwerkt.")
             time.sleep(args.interval)

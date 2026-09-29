@@ -1,0 +1,91 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% block title %}{{ m.subject }}{% endblock %}
+{% block content %}
+{% set pending = m.status.value == 'PENDING_APPROVAL' %}
+<div class="page"{% if m.status.value == 'APPROVED' %} data-pulse="/app/ops/pulse" data-pulse-v="{{ pulse }}"{% endif %}>
+  {% call ui.page_head('E-mail beoordelen' if pending else 'E-mail', (position ~ ' van ' ~ queue_len ~ ' wachten op goedkeuring') if position else OUTREACH_KIND[m.kind] ~ ' aan ' ~ (m.to_name or m.to_email), [('Outreach', '/app/outreach?tab=approval')]) %}
+    {% if next_id %}<a class="btn btn-ghost" href="/app/outreach/{{ next_id }}">Volgende {{ icon('arrow-right') }}</a>{% endif %}
+  {% endcall %}
+
+  {% if m.status.value == 'APPROVED' %}<div class="alert info">{{ icon('settings') }}<span><b>Goedgekeurd; de Email-agent verstuurt het bericht.</b> Deze pagina werkt zichzelf bij.{% if task %} <a href="/app/ops/tasks/{{ task.id }}">Taak #{{ task.number }}</a>{% endif %}</span></div>{% endif %}
+  {% if m.status.value == 'SENT' %}<div class="alert {{ 'positive' if m.delivery == 'live' else 'review' }}">{{ icon('check-circle' if m.delivery == 'live' else 'info') }}<span>{% if m.delivery == 'live' %}<b>Verstuurd</b> {{ m.sent_at|d }} via de mailserver.{% else %}<span class="env-badge mock">Mock</span> <b>MOCK verstuurd</b> {{ m.sent_at|d }}: als bestand opgeslagen, niet echt verzonden.{% endif %} Goedgekeurd door {{ users[m.decided_by_id].email if m.decided_by_id in users else 'onbekend' }}.</span></div>{% endif %}
+  {% if m.status.value == 'FAILED' %}<div class="alert critical">{{ icon('alert') }}<span><b>Verzenden mislukt.</b> {{ m.error }}</span></div>{% endif %}
+  {% if m.status.value == 'REJECTED' %}<div class="alert review">{{ icon('x-circle') }}<span><b>Afgewezen</b>{% if m.decision_note %}: {{ m.decision_note }}{% endif %}{% if m.error %} — {{ m.error }}{% endif %}</span></div>{% endif %}
+  {% if p.do_not_contact or (c and c.do_not_contact) %}<div class="alert critical">{{ icon('lock') }}<span><b>Niet benaderen.</b> Deze ontvanger staat op de suppressielijst; dit bericht kan niet worden verstuurd.</span></div>{% endif %}
+
+  <div class="grid-3-1">
+    <article class="mail" aria-label="E-mail">
+      <div class="mail-kicker"><span>Uitgaande e-mail · {{ OUTREACH_KIND[m.kind] }}</span><span class="row">{{ crm.outreach_status(m) }}{% if not mail.live %} {{ crm.env(False) }}{% endif %} {{ crm.testdata(m.is_test_data) }}</span></div>
+      <dl class="mail-head">
+        <dt>Aan</dt><dd><b>{{ m.to_name or 'Algemeen e-mailadres' }}</b>{% if c and c.role %} · {{ c.role }}{% endif %}<br><span class="muted">{{ m.to_email }}</span> {% if c %}{{ crm.email_kind(c) }}{% endif %}</dd>
+        <dt>Bedrijf</dt><dd><a href="/app/leads/{{ p.id }}">{{ p.company_name }}</a> <span class="muted">· {{ crm.sector_label(p.sector) }}{% if p.city %}, {{ p.city }}{% endif %}</span></dd>
+        <dt>Van</dt><dd>{{ mail.from }}</dd>
+        {% if not edit %}<dt>Onderwerp</dt><dd class="subject">{{ m.subject }}</dd>{% endif %}
+      </dl>
+      {% if edit and pending %}
+      <form method="post" action="/app/outreach/{{ m.id }}/save">
+        {{ ui.csrf_field() }}<input type="hidden" name="next_id" value="{{ next_id or '' }}">
+        <div class="mail-edit">
+          <div class="field"><label for="subject">Onderwerp</label><input id="subject" name="subject" type="text" maxlength="300" value="{{ m.subject }}" required></div>
+          <div class="field"><label for="body">Tekst</label><textarea id="body" name="body" required>{{ m.body }}</textarea></div>
+        </div>
+        <div class="mail-actions"><a class="btn" href="/app/outreach/{{ m.id }}">Annuleren</a><span class="actions"><button class="btn" type="submit">Opslaan</button><button class="btn btn-positive" type="submit" formaction="/app/outreach/{{ m.id }}/approve">{{ icon('send') }}Opslaan, goedkeuren en versturen</button></span></div>
+      </form>
+      {% else %}
+      <div class="mail-body">{{ m.body }}</div>
+      {% if pending %}
+      <div class="mail-actions">
+        <span class="word-count{{ ' over' if words > 150 }}">{{ words }} woorden{% if words > 150 %} · langer dan 150{% endif %}{% if m.edited %} · aangepast{% endif %}</span>
+        <span class="actions">
+          <a class="btn" href="/app/outreach/{{ m.id }}?edit=1">{{ icon('edit') }}Bewerken</a>
+          <button class="btn btn-danger" type="button" data-dialog-open="reject-dialog">Afwijzen</button>
+          <form method="post" action="/app/outreach/{{ m.id }}/approve" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="next_id" value="{{ next_id or '' }}"><button class="btn btn-positive" type="submit">{{ icon('send') }}Goedkeuren en versturen</button></form>
+        </span>
+      </div>
+      {% elif m.status.value in ('FAILED', 'REJECTED', 'OUTBOX') and not p.do_not_contact %}
+      <div class="mail-actions"><span class="small muted">{{ 'Mailserver hersteld?' if m.status.value == 'FAILED' else 'Toch versturen?' }}</span><form method="post" action="/app/outreach/{{ m.id }}/reopen" class="inline">{{ ui.csrf_field() }}<button class="btn" type="submit">Opnieuw ter goedkeuring aanbieden</button></form></div>
+      {% endif %}
+      {% endif %}
+    </article>
+
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><h2>Waarom dit bedrijf</h2></div>
+        <div class="panel-body">{% if p.relevance %}<ul class="reasons">{% for r in p.relevance %}<li>{{ icon('check') }}<span>{{ r.text }}<span class="src">{{ crm.src(r.source) }}</span></span></li>{% endfor %}</ul>
+          {% elif p.source == 'aanvraag' %}<p class="small">Heeft zelf een aanvraag gedaan via de website.</p>{% else %}<p class="small muted">Geen onderbouwing vastgelegd.</p>{% endif %}
+          {% if p.qualification %}<div class="row mt-s small"><span class="muted">Kwalificatie</span>{{ crm.qual(p.qualification) }}</div>{% endif %}
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Onderzoek en bronnen</h2></div>
+        <div class="panel-body stack">
+          {% if c %}<div><div class="label">Contact</div><p class="small">{{ c.full_name or 'Algemeen e-mailadres' }}{% if c.role %} · {{ c.role }}{% endif %} {{ ui.conf(c.confidence) }}</p><p class="small">{{ crm.src(c.source_url, SOURCES.get(c.source, c.source)) }}</p>{% if c.source_excerpt %}<div class="contact-card-quote quote small muted">“{{ c.source_excerpt }}”</div>{% endif %}</div>{% endif %}
+          <div><div class="label">Bedrijf</div>{% for e in p.evidence or [] %}<p class="small">{{ crm.src(e.url, e.label) }}</p>{% else %}<p class="small muted">Geen bron vastgelegd.</p>{% endfor %}</div>
+          {% if m.personalization %}<div><div class="label">Gebruikt in de tekst</div><ul class="reasons mt-xs">{% for f in m.personalization %}<li>{{ icon('arrow-right') }}<span>{{ f.fact }}{% if f.source %}<span class="src">{{ crm.src(f.source) if f.source.startswith('http') else f.source }}</span>{% endif %}</span></li>{% endfor %}</ul></div>{% endif %}
+        </div>
+      </section>
+      {% if reply_to %}
+      <section class="panel"><div class="panel-head"><h2>Reactie waarop dit antwoordt</h2>{{ crm.reply(reply_to.category) }}</div><div class="panel-body"><p class="small muted">Van {{ reply_to.from_name or reply_to.from_email }} · {{ reply_to.received_at|d }}</p><div class="quoted mt-s">{{ reply_to.body[:1200] }}</div></div></section>
+      {% endif %}
+      {% if m.status.value == 'SENT' and not mail.live and m.kind.value != 'REPLY' %}
+      <form class="panel" method="post" action="/app/inbox/simulate">
+        {{ ui.csrf_field() }}<input type="hidden" name="message_id" value="{{ m.id }}">
+        <div class="panel-head"><div><h2>Antwoord simuleren</h2><p>Alleen in MOCK-modus: zet een antwoord in de testmailbox, zoals de ontvanger zou reageren.</p></div>{{ crm.env(False) }}</div>
+        <div class="panel-body"><label class="sr-only" for="sim">Antwoord</label><textarea id="sim" name="body" required>Interessant. Kunnen we hier volgende week even over bellen?</textarea></div>
+        <div class="form-foot"><button class="btn" type="submit">{{ icon('inbox') }}Antwoord in mailbox zetten</button></div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <dialog id="reject-dialog" aria-labelledby="rj-title">
+    <form method="post" action="/app/outreach/{{ m.id }}/reject" data-no-loading>
+      {{ ui.csrf_field() }}<input type="hidden" name="next_id" value="{{ next_id or '' }}">
+      <div class="dialog-head"><h2 id="rj-title">E-mail afwijzen</h2><p>Het bericht wordt niet verstuurd. Uw reden wordt bewaard bij de lead.</p></div>
+      <div class="dialog-body"><div class="field"><label for="rj-note">Reden</label><textarea id="rj-note" name="note" required placeholder="Bijv. verkeerde contactpersoon, of bedrijf is al klant."></textarea></div></div>
+      <div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Annuleren</button><button class="btn btn-danger-solid" type="submit">Afwijzen</button></div>
+    </form>
+  </dialog>
+</div>
+{% endblock %}

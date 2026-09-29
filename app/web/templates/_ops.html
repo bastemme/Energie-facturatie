@@ -1,5 +1,5 @@
 {% import "_ui.html" as ui with context %}
-{% set STATE_NL = {'running':'Actief','idle':'Beschikbaar','waiting':'Wacht op goedkeuring','failed':'Laatste taak mislukt','disabled':'Uitgeschakeld','planned':'Nog niet gebouwd'} %}
+{% set STATE_NL = {'running':'Actief','queued':'Wachtend','idle':'Beschikbaar','waiting':'Wacht op goedkeuring','failed':'Fout','disabled':'Uitgeschakeld','planned':'Nog niet gebouwd'} %}
 {% set TASK_NL = {'QUEUED':('In wachtrij','neutral'),'RUNNING':('Bezig','brand'),'WAITING_APPROVAL':('Wacht op goedkeuring','review'),'COMPLETED':('Afgerond','positive'),'FAILED':('Mislukt','critical'),'CANCELLED':('Geannuleerd','quiet')} %}
 
 {% macro state(s) %}<span class="state {{ s }}">{{ STATE_NL[s] }}</span>{% endmacro %}
@@ -13,8 +13,9 @@
 {% macro task_row(t, names, runnable=None, side=None) %}
 <li><a href="/app/ops/tasks/{{ t.id }}">
   {{ task_icon(t.status) }}
-  <span><span class="t-title">{{ t.title }}</span>
-    <span class="t-meta">{{ names.get(t.agent_id, t.agent_id) }}{% if t.status.value == 'QUEUED' and runnable is not none and t.agent_id not in runnable %} · wacht tot deze agent gebouwd is{% elif t.status.value == 'FAILED' and t.error %} · {{ t.error }}{% endif %}</span></span>
+  <span><span class="t-title">{% if t.number %}<span class="muted num">#{{ t.number }}</span> {% endif %}{{ t.title }}</span>
+    <span class="t-meta">{{ names.get(t.agent_id, t.agent_id) }}{% set prog = live_progress(t) %}{% if prog %} · {{ prog[0] }} / {{ prog[1] }}{% endif %}{% if t.status.value == 'QUEUED' and runnable is not none and t.agent_id not in runnable %} · wacht tot deze agent gebouwd is{% elif t.status.value == 'FAILED' and t.error %} · {{ t.error }}{% endif %}</span>
+    {% if prog and t.status.value == 'RUNNING' %}<span class="t-prog">{{ progress_bar(prog[0], prog[1]) }}</span>{% endif %}</span>
   <span class="t-side">{{ side or (t.duration_ms|duration if t.finished_at else t.created_at|ago) }}</span>
 </a></li>
 {% endmacro %}

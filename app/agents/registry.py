@@ -14,8 +14,11 @@ _SPECS: dict[str, AgentSpec] = {a.id: a for a in AGENTS}
 
 def _implementations() -> dict[str, Agent]:
     from app.agents.lead_researcher import LeadResearcher
+    from app.agents.pipeline import ContactResearcher, EmailAgent, FollowUpAgent, LeadQualifier, OutreachAgent
 
-    return {"lead_researcher": LeadResearcher()}
+    return {"lead_researcher": LeadResearcher(), "lead_qualifier": LeadQualifier(),
+            "contact_researcher": ContactResearcher(), "outreach": OutreachAgent(), "email": EmailAgent(),
+            "follow_up": FollowUpAgent()}
 
 
 def get_spec(agent_id: str) -> AgentSpec | None:

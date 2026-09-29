@@ -10,7 +10,7 @@ from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Tex
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-from app.domain.enums import AgentStatus, ApprovalStatus, ProspectStatus, TaskStatus
+from app.domain.enums import AgentStatus, ApprovalStatus, LeadStage, ProspectStatus, Qualification, TaskStatus
 from app.models.base import IdMixin, TimestampMixin, enum_type, utcnow
 
 
@@ -56,6 +56,9 @@ class AgentTask(IdMixin, TimestampMixin, Base):
     created_by_agent_id: Mapped[str | None] = mapped_column(String(64))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    number: Mapped[int | None] = mapped_column(Integer, index=True)  # human-friendly, e.g. #1042
+    progress_done: Mapped[int | None] = mapped_column(Integer)
+    progress_total: Mapped[int | None] = mapped_column(Integer)
 
     logs: Mapped[list["AgentLog"]] = relationship(back_populates="task", cascade="all, delete-orphan",
                                                   order_by="AgentLog.created_at")
@@ -138,7 +141,8 @@ class SharedContext(IdMixin, Base):
 
 
 class Prospect(IdMixin, TimestampMixin, Base):
-    """A company found by research (outbound pipeline). Contains company data only — no personal contacts."""
+    """A company in the sales pipeline: found by research or via the website form. Shown as a lead (CRM
+    pipeline fields) and as a company (firmographics). Personal contacts live in `contacts`."""
 
     __tablename__ = "prospects"
 
@@ -165,3 +169,33 @@ class Prospect(IdMixin, TimestampMixin, Base):
     discovered_by_agent_id: Mapped[str | None] = mapped_column(String(64))
     research_task_id: Mapped[str | None] = mapped_column(ForeignKey("agent_tasks.id", ondelete="SET NULL"))
     lead_id: Mapped[str | None] = mapped_column(ForeignKey("leads.id", ondelete="SET NULL"))
+    # CRM pipeline (nullable so existing databases upgrade in place; NULL stage means NEW)
+    stage_value: Mapped[LeadStage | None] = mapped_column("stage", enum_type(LeadStage), index=True,
+                                                          default=LeadStage.NEW)
+    qualification: Mapped[Qualification | None] = mapped_column(enum_type(Qualification))
+    qualification_reasons: Mapped[list | None] = mapped_column(JSON)
+    qualified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locations_count: Mapped[int | None] = mapped_column(Integer)
+    relevance: Mapped[list | None] = mapped_column(JSON)  # [{text, source}]: why it may be relevant, with source
+    last_contact_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_action: Mapped[str | None] = mapped_column(String(300))
+    next_action_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    do_not_contact: Mapped[bool | None] = mapped_column(Boolean, default=False)
+    client_id: Mapped[str | None] = mapped_column(ForeignKey("clients.id", ondelete="SET NULL"))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    contacts: Mapped[list["Contact"]] = relationship(  # noqa: F821
+        back_populates="prospect", cascade="all, delete-orphan", order_by="Contact.created_at")
+
+    @property
+    def stage(self) -> LeadStage:
+        return self.stage_value or LeadStage.NEW
+
+    @stage.setter
+    def stage(self, value: LeadStage) -> None:
+        self.stage_value = value
+
+    @property
+    def primary_contact(self):
+        usable = [c for c in self.contacts if not c.do_not_contact]
+        return max(usable, key=lambda c: (c.email is not None, c.confidence_rank, c.priority), default=None)

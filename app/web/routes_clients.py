@@ -75,7 +75,7 @@ CONSENT_TEXT_VERSION = "machtiging-v1"
 @router.get("/app")
 def app_home(user: User = Depends(require_user)):
     if user.is_staff:
-        return redirect("/app/admin")
+        return redirect("/app/dashboard")
     return redirect(f"/app/clients/{user.client_id}")
 
 

@@ -1,0 +1,29 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% block title %}Contacten{% endblock %}
+{% block content %}
+<div class="page page-wide">
+  {{ ui.page_head('Contacten', 'Zakelijke contactpersonen en algemene bedrijfsadressen, alleen uit openbare bronnen of zelf opgegeven. Elk contact heeft een bron en een zekerheid.') }}
+  <form class="filters" method="get" action="/app/contacts">
+    <label class="sr-only" for="q">Zoeken</label><input id="q" type="search" name="q" value="{{ filters.q }}" placeholder="Zoek op naam, e-mail of bedrijf">
+    <label class="sr-only" for="r">Rol</label><select id="r" name="role"><option value="">Alle rollen</option>{% for key, label in ROLE_CATEGORIES.items() %}<option value="{{ key }}"{% if filters.role == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <label class="sr-only" for="cf">Zekerheid</label><select id="cf" name="confidence"><option value="">Elke zekerheid</option><option value="HIGH"{% if filters.confidence == 'HIGH' %} selected{% endif %}>Hoog</option><option value="MEDIUM"{% if filters.confidence == 'MEDIUM' %} selected{% endif %}>Middel</option><option value="LOW"{% if filters.confidence == 'LOW' %} selected{% endif %}>Laag</option></select>
+    <label class="sr-only" for="em">Type</label><select id="em" name="email"><option value="">Alle</option><option value="named"{% if filters.email == 'named' %} selected{% endif %}>Met naam</option><option value="yes"{% if filters.email == 'yes' %} selected{% endif %}>Met e-mailadres</option></select>
+    <button class="btn" type="submit">Filteren</button>
+  </form>
+  <section class="panel">
+    {% if contacts %}<div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Naam</th><th>Bedrijf</th><th>E-mail</th><th>LinkedIn</th><th>Bron</th><th>Zekerheid</th><th>Status</th></tr></thead>
+      <tbody>{% for c in contacts %}<tr{% if c.do_not_contact %} class="suppressed"{% endif %}>
+        <td><span class="primary">{{ c.full_name or 'Algemeen e-mailadres' }}</span><span class="sub">{{ c.role or 'Functie onbekend' }} {{ crm.testdata(c.is_test_data) }}</span></td>
+        <td data-label="Bedrijf"><a href="/app/leads/{{ c.prospect_id }}">{{ c.prospect.company_name }}</a></td>
+        <td data-label="E-mail">{% if c.email %}{{ c.email }}<span class="sub">{{ crm.email_kind(c) }}</span>{% else %}{{ crm.unknown() }}{% endif %}</td>
+        <td data-label="LinkedIn">{% if c.linkedin_url %}<a href="{{ c.linkedin_url }}" target="_blank" rel="noopener noreferrer">Profiel {{ icon('external') }}</a>{% else %}{{ crm.unknown() }}{% endif %}</td>
+        <td data-label="Bron" class="small">{{ crm.src(c.source_url, SOURCES.get(c.source, c.source)) }}</td>
+        <td data-label="Zekerheid">{{ ui.conf(c.confidence) }}</td>
+        <td data-label="Status">{% if c.do_not_contact %}{{ crm.dnc(True) }}{% elif c.id in sent_to %}{{ ui.chip('Gemaild', 'brand') }}{% else %}<span class="small muted">—</span>{% endif %}</td>
+      </tr>{% endfor %}</tbody></table></div>
+    {% else %}{{ ui.empty('users', 'Geen contacten' if total else 'Nog geen contacten', 'De Contact Researcher leest de openbare website van gekwalificeerde bedrijven en legt beslissers vast met bron. U kunt ook zelf contacten toevoegen bij een lead.') }}{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.domain.enums import DocumentStatus, LeadStatus, RateKind, ReviewStatus, Role
-from app.models import AnalysisRun, Anomaly, AuditLog, Client, Document, Lead, ReferenceRate, User
+from app.domain.enums import DocumentStatus, RateKind, ReviewStatus, Role
+from app.models import AnalysisRun, Anomaly, AuditLog, Client, Document, ReferenceRate, User
 from app.models.base import utcnow
 from app.services.audit import audit
 from app.services.metrics import operator_metrics, summary
@@ -19,6 +19,7 @@ from app.web.view import bar_chart, category_distribution, monthly_series, pipel
 router = APIRouter()
 
 
+@router.get("/app/analyses")
 @router.get("/app/admin")
 def admin_dashboard(request: Request, user: User = Depends(require_staff), db: Session = Depends(get_db)):
     problem_docs = db.scalars(select(Document).where(Document.status.in_(
@@ -38,9 +39,7 @@ def admin_dashboard(request: Request, user: User = Depends(require_staff), db: S
                   failed_runs=failed_runs, clients={c.id: c for c in clients},
                   client_rows=[(c, summary(db, c.id)) for c in clients], queue=queue[:4], queue_total=len(queue),
                   stages=pipeline_stages(s), distribution=category_distribution(anomalies),
-                  bar=bar_chart(series) if series else None,
-                  new_leads=db.scalars(select(Lead).where(Lead.status == LeadStatus.NEW)
-                                       .order_by(Lead.created_at.desc())).all())
+                  bar=bar_chart(series) if series else None)
 
 
 @router.get("/app/designsysteem")
@@ -93,23 +92,6 @@ def rates_verify(rate_id: str, request: Request, user: User = Depends(require_ad
     db.commit()
     flash(request, "Tarief geverifieerd; het wordt gebruikt bij de volgende analyse.", "success")
     return redirect("/app/reference-rates")
-
-
-@router.get("/app/leads")
-def leads_list(request: Request, user: User = Depends(require_staff), db: Session = Depends(get_db)):
-    leads = db.scalars(select(Lead).order_by(Lead.created_at.desc()).limit(500)).all()
-    return render(request, "admin/leads.html", user=user, leads=leads, statuses=list(LeadStatus))
-
-
-@router.post("/app/leads/{lead_id}/status", dependencies=[Depends(verify_csrf)])
-def lead_status(lead_id: str, request: Request, status: str = Form(...), user: User = Depends(require_staff),
-                db: Session = Depends(get_db)):
-    lead = db.get(Lead, lead_id)
-    if lead and status in LeadStatus.__members__:
-        lead.status = LeadStatus(status)
-        audit(db, "lead.status", user=user, object_type="lead", object_id=lead.id, details={"status": status})
-        db.commit()
-    return redirect("/app/leads")
 
 
 @router.get("/app/users")

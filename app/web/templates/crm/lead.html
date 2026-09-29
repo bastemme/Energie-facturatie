@@ -1,0 +1,138 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% block title %}{{ p.company_name }}{% endblock %}
+{% block content %}
+{% set primary = p.primary_contact %}
+<div class="page"{% if running %} data-pulse="/app/ops/pulse" data-pulse-v="{{ pulse }}"{% endif %}>
+  {% call ui.page_head(p.company_name, crm.sector_label(p.sector) ~ (' · ' ~ p.city if p.city else '') ~ (' · ' ~ p.domain if p.domain else ''), [('Leads', '/app/leads')]) %}
+    {% if p.website and not p.do_not_contact %}<form method="post" action="/app/leads/{{ p.id }}/find-contacts" class="inline">{{ ui.csrf_field() }}<button class="btn" type="submit">{{ icon('user') }}Beslisser zoeken</button></form>{% endif %}
+    {% if primary and primary.email and not p.do_not_contact %}<form method="post" action="/app/leads/{{ p.id }}/draft" class="inline">{{ ui.csrf_field() }}<button class="btn btn-primary" type="submit">{{ icon('send') }}E-mail opstellen</button></form>{% endif %}
+  {% endcall %}
+
+  <div class="row">{{ crm.stage(p.stage) }} {{ crm.qual(p.qualification) }} {{ crm.dnc(p.do_not_contact) }} {{ crm.testdata(p.is_test_data) }}{% if p.next_action %}<span class="small muted">Volgende actie: <b>{{ p.next_action }}</b>{% if p.next_action_at %} · {{ p.next_action_at|d }}{% endif %}</span>{% endif %}</div>
+
+  {% if running %}<div class="alert info">{{ icon('settings') }}<span><b>Bezig:</b> {% for t in running %}<a href="/app/ops/tasks/{{ t.id }}">#{{ t.number }} {{ t.title }}</a>{{ ', ' if not loop.last }}{% endfor %}. Deze pagina werkt zichzelf bij.</span></div>{% endif %}
+  {% if p.do_not_contact %}<div class="alert critical">{{ icon('lock') }}<span><b>Niet benaderen.</b> Dit bedrijf staat op de suppressielijst; er kunnen geen e-mails meer worden opgesteld of verstuurd.</span></div>{% endif %}
+
+  <div class="grid-3-1">
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><div><h2>Waarom mogelijk relevant</h2><p>Alleen wat een bron zegt. Het werkelijke energieverbruik is onbekend tot we facturen zien.</p></div>{% if p.source != 'aanvraag' %}<span class="small muted num">Fitscore {{ p.fit_score }} / 100</span>{% endif %}</div>
+        <div class="panel-body">
+          {% if p.relevance %}<ul class="reasons">{% for r in p.relevance %}<li>{{ icon('check') }}<span>{{ r.text }}<span class="src">Bron: {{ crm.src(r.source) }}</span></span></li>{% endfor %}</ul>
+          {% elif p.source == 'aanvraag' %}<ul class="reasons"><li>{{ icon('check') }}<span>Heeft zelf een aanvraag gedaan via de website.{% if p.notes %}<span class="src">Bericht: {{ p.notes }}</span>{% endif %}</span></li></ul>
+          {% elif p.fit_reasons %}<ul class="reasons">{% for r in p.fit_reasons %}<li>{{ icon('check') }}<span>{{ r }}</span></li>{% endfor %}</ul>
+          {% else %}<p class="small muted">Nog niet onderzocht.</p>{% endif %}
+          {% if p.qualification %}<hr><div class="row-between"><h3 class="label">Kwalificatie</h3>{{ crm.qual(p.qualification) }}</div>
+          <ul class="reasons mt-s">{% for r in p.qualification_reasons or [] %}<li>{{ icon('arrow-right') }}<span>{{ r }}</span></li>{% endfor %}</ul>{% endif %}
+        </div>
+      </section>
+
+      <section class="panel" id="contacten">
+        <div class="panel-head"><div><h2>Contacten</h2><p>Alleen openbare, zakelijke gegevens, met bron. Niets is geraden of aangevuld.</p></div><button class="btn btn-sm" type="button" data-dialog-open="contact-dialog">{{ icon('plus') }}Handmatig toevoegen</button></div>
+        {% if p.contacts %}
+        {% for c in p.contacts %}
+        <div class="contact-card{{ ' suppressed' if c.do_not_contact }}">
+          <span class="avatar{{ ' generic' if not c.full_name }}">{% if c.full_name %}{{ c.full_name[:1] }}{% else %}{{ icon('inbox') }}{% endif %}</span>
+          <div>
+            <h3>{{ c.full_name or 'Algemeen e-mailadres' }} {% if c.is_test_data %}{{ crm.testdata(True) }}{% endif %} {{ crm.dnc(c.do_not_contact) }}</h3>
+            <div class="small muted">{{ c.role or crm.unknown('Functie onbekend') }} · {{ ROLE_CATEGORIES.get(c.role_category, '') }}</div>
+            <div class="meta">
+              {% if c.email %}<span>{{ icon('leads') }}{{ c.email }} {{ crm.email_kind(c) }}</span>{% else %}<span>{{ crm.unknown('E-mailadres onbekend') }}</span>{% endif %}
+              {% if c.linkedin_url %}<a href="{{ c.linkedin_url }}" target="_blank" rel="noopener noreferrer">{{ icon('link') }}LinkedIn</a>{% else %}<span>{{ crm.unknown('LinkedIn onbekend') }}</span>{% endif %}
+              {% if c.phone %}<span>{{ icon('phone') }}{{ c.phone }}</span>{% endif %}
+              {{ ui.conf(c.confidence) }}
+            </div>
+            <div class="meta">Bron: {{ crm.src(c.source_url, SOURCES.get(c.source, c.source) ~ (' · ' ~ c.source_url|replace('https://', '')|truncate(40, True, '…') if c.source_url and c.source_url.startswith('http') else '')) }}</div>
+            {% if c.source_excerpt %}<div class="quote">“{{ c.source_excerpt }}”</div>{% endif %}
+          </div>
+          <div class="actions">
+            {% if c.email and not c.do_not_contact and not p.do_not_contact %}<form method="post" action="/app/leads/{{ p.id }}/draft" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="contact_id" value="{{ c.id }}"><button class="btn btn-sm" type="submit">{{ icon('send') }}Mailen</button></form>{% endif %}
+            {% if not c.do_not_contact %}<form method="post" action="/app/leads/{{ p.id }}/do-not-contact" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="contact_id" value="{{ c.id }}"><input type="hidden" name="reason" value="handmatig"><button class="btn btn-sm btn-ghost" type="submit" data-tip="Nooit meer mailen">Niet benaderen</button></form>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        {% call ui.empty('user', 'Contact niet gevonden', 'Er is (nog) geen beslisser of zakelijk e-mailadres gevonden in een openbare bron. Laat de Contact Researcher de website lezen, of voeg een contact toe met bron.') %}{% if p.website %}<form method="post" action="/app/leads/{{ p.id }}/find-contacts" class="inline">{{ ui.csrf_field() }}<button class="btn btn-primary btn-sm" type="submit">{{ icon('user') }}Beslisser zoeken</button></form>{% endif %}<button class="btn btn-sm" type="button" data-dialog-open="contact-dialog">Handmatig toevoegen</button>{% endcall %}
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2>E-mails en reacties</h2><a class="small" href="/app/outreach">Outreach</a></div>
+        {% if emails or replies %}
+        <ul class="tasklist">
+          {% for m in emails %}<li><a href="/app/outreach/{{ m.id }}"><span class="t-icon">{{ icon('send') }}</span><span><span class="t-title">{{ m.subject }}</span><span class="t-meta">{{ OUTREACH_KIND[m.kind] }} aan {{ m.to_name or m.to_email }}</span></span><span class="t-side">{{ crm.outreach_status(m) }}</span></a></li>{% endfor %}
+          {% for r in replies %}<li><a href="/app/inbox/{{ r.id }}"><span class="t-icon">{{ icon('inbox') }}</span><span><span class="t-title">{{ r.subject }}</span><span class="t-meta">Van {{ r.from_name or r.from_email }} · {{ r.received_at|ago }}</span></span><span class="t-side">{{ crm.reply(r.category) }}</span></a></li>{% endfor %}
+        </ul>
+        {% else %}<div class="panel-body small muted">Nog geen e-mails. Zodra er een contact met e-mailadres is, stelt de Outreach-agent een concept op dat u eerst beoordeelt.</div>{% endif %}
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2>Tijdlijn</h2></div>
+        <div class="panel-body">{% if events %}<ul class="timeline-list">{% for e in events %}<li><time>{{ e.created_at|d }}</time><span>{{ e.message }}<span class="by"> · {% if e.user_id %}{{ users[e.user_id].email if e.user_id in users else 'medewerker' }}{% elif e.agent_id == 'human' %}medewerker{% elif e.agent_id %}{{ agent_names.get(e.agent_id, e.agent_id) }}{% else %}systeem{% endif %}{% if e.task_id %} · <a href="/app/ops/tasks/{{ e.task_id }}">taak</a>{% endif %}</span></span></li>{% endfor %}</ul>
+        {% else %}<p class="small muted">Nog geen activiteit.</p>{% endif %}</div>
+      </section>
+    </div>
+
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><h2>Bedrijfsgegevens</h2></div>
+        <div class="panel-body"><dl class="facts">
+          <dt>Branche</dt><dd>{{ crm.sector_label(p.sector) }}</dd>
+          <dt>Adres</dt><dd>{% if p.street or p.postcode %}{{ p.street or '' }}<br>{{ p.postcode or '' }} {{ p.city or '' }}{% else %}{{ crm.unknown() }}{% endif %}</dd>
+          <dt>Website</dt><dd>{% if p.website %}{{ crm.src(p.website, p.domain) }}{% else %}{{ crm.unknown() }}{% endif %}</dd>
+          <dt>Telefoon</dt><dd>{{ p.phone or crm.unknown() }}</dd>
+          <dt>KvK-nummer</dt><dd>{{ p.kvk_number or crm.unknown() }}</dd>
+          <dt>Vestigingen</dt><dd>{{ p.locations_count or crm.unknown() }}</dd>
+          <dt>Energieverbruik</dt><dd>{{ crm.unknown() }}</dd>
+          <dt>Bron</dt><dd>{% for e in p.evidence or [] %}<div>{{ crm.src(e.url, e.label) }}<span class="small muted"> · {{ (e.retrieved_at or '')[:10] }}</span></div>{% else %}{{ crm.unknown() }}{% endfor %}</dd>
+          {% if p.research_task_id %}<dt>Gevonden door</dt><dd><a href="/app/ops/tasks/{{ p.research_task_id }}">Lead Researcher</a></dd>{% endif %}
+          {% if client %}<dt>Klant</dt><dd><a href="/app/clients/{{ client.id }}">{{ client.company_name }}</a></dd>{% endif %}
+        </dl></div>
+      </section>
+
+      {% if tasks %}
+      <section class="panel">
+        <div class="panel-head"><h2>Taken</h2><span class="small muted">{{ tasks|selectattr('is_open')|list|length }} open</span></div>
+        <ul class="tasklist">{% for t in tasks %}<li><form method="post" action="/app/leads/{{ p.id }}/tasks/{{ t.id }}" class="row-between">{{ ui.csrf_field() }}<span><span class="t-title">{% if not t.is_open %}<s>{{ t.title }}</s>{% else %}{{ t.title }}{% endif %}</span><span class="t-meta">{% if t.due_at %}Uiterlijk {{ t.due_at|d }}{% endif %}{% if t.created_by_agent_id %} · {{ agent_names.get(t.created_by_agent_id, t.created_by_agent_id) }}{% endif %}</span></span>{% if t.is_open %}<button class="btn btn-sm" type="submit">{{ icon('check') }}Klaar</button>{% endif %}</form></li>{% endfor %}</ul>
+      </section>
+      {% endif %}
+
+      <form class="panel" method="post" action="/app/leads/{{ p.id }}/update">
+        {{ ui.csrf_field() }}
+        <div class="panel-head"><h2>Opvolging</h2></div>
+        <div class="panel-body stack">
+          <div class="field"><label for="stage">Status</label><select id="stage" name="stage">{% for st in stages %}<option value="{{ st.value }}"{% if st == p.stage %} selected{% endif %}>{{ STAGES[st][0] }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="next_action">Volgende actie</label><input id="next_action" name="next_action" type="text" maxlength="300" value="{{ p.next_action or '' }}"></div>
+          <div class="field"><label for="next_action_at">Datum</label><input id="next_action_at" name="next_action_at" type="date" value="{{ p.next_action_at.strftime('%Y-%m-%d') if p.next_action_at else '' }}"></div>
+          <div class="field"><label for="notes">Notities</label><textarea id="notes" name="notes">{{ p.notes or '' }}</textarea></div>
+        </div>
+        <div class="form-foot"><button class="btn btn-primary" type="submit">Opslaan</button></div>
+      </form>
+
+      {% if not p.do_not_contact %}
+      <form class="panel panel-pad stack" method="post" action="/app/leads/{{ p.id }}/do-not-contact">
+        {{ ui.csrf_field() }}
+        <div><h3>Niet meer benaderen</h3><p class="small muted">Zet het bedrijf en alle adressen op de suppressielijst en trek openstaande concepten in.</p></div>
+        <input name="reason" type="text" placeholder="Reden (bijv. verzoek per telefoon)" aria-label="Reden">
+        <div><button class="btn btn-danger btn-sm" type="submit">{{ icon('lock') }}Niet benaderen</button></div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <dialog id="contact-dialog" aria-labelledby="cd-title">
+    <form method="post" action="/app/leads/{{ p.id }}/contacts" data-no-loading>
+      {{ ui.csrf_field() }}
+      <div class="dialog-head"><h2 id="cd-title">Contact toevoegen</h2><p>Alleen openbare, zakelijke gegevens. Vermeld waar u ze vond.</p></div>
+      <div class="dialog-body">
+        <div class="fields"><div class="field"><label for="c-name">Naam</label><input id="c-name" name="full_name" type="text" maxlength="200"></div><div class="field"><label for="c-role">Functie</label><input id="c-role" name="role" type="text" maxlength="200" placeholder="Bijv. Financieel manager"></div></div>
+        <div class="fields"><div class="field"><label for="c-email">Zakelijk e-mailadres</label><input id="c-email" name="email" type="email" maxlength="254"></div><div class="field"><label for="c-phone">Telefoon</label><input id="c-phone" name="phone" type="text" maxlength="50"></div></div>
+        <div class="field"><label for="c-li">LinkedIn-profiel</label><input id="c-li" name="linkedin_url" type="text" maxlength="300" placeholder="https://www.linkedin.com/in/…"></div>
+        <div class="field"><label for="c-src">Bron</label><input id="c-src" name="source_url" type="text" maxlength="500" required placeholder="URL van de pagina, of bijv. 'telefonisch opgegeven'"></div>
+      </div>
+      <div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Annuleren</button><button class="btn btn-primary" type="submit">Toevoegen</button></div>
+    </form>
+  </dialog>
+</div>
+{% endblock %}

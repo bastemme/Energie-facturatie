@@ -1,0 +1,41 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% block title %}Outreach{% endblock %}
+{% block content %}
+<div class="page">
+  {% call ui.page_head('Outreach', 'Elke e-mail wordt door een agent opgesteld en pas verstuurd nadat u hem heeft goedgekeurd.') %}
+    {{ crm.env(mail.live) }}
+    <form method="post" action="/app/outreach/follow-ups" class="inline">{{ ui.csrf_field() }}<button class="btn" type="submit" data-tip="Stelt opvolgconcepten op voor e-mails zonder reactie na {{ follow_days }} dagen">{{ icon('clock') }}Opvolging controleren</button></form>
+    {% if tab == 'approval' and items %}<a class="btn btn-primary" href="/app/outreach/{{ items[0].id }}">{{ icon('eye') }}Beoordelen starten</a>{% endif %}
+  {% endcall %}
+
+  {% if not mail.live %}<div class="alert review">{{ icon('info') }}<span><span class="env-badge mock">Mock</span> <b>E-mail staat in MOCK-modus.</b> Goedgekeurde berichten worden als bestand opgeslagen en niet echt verzonden. Stel <code>ER_EMAIL_PROVIDER=smtp</code> en de SMTP/IMAP-gegevens in om live te versturen (zie <a href="/app/settings">Instellingen</a>).</span></div>
+  {% elif not mail.can_send %}<div class="alert critical">{{ icon('alert') }}<span><b>E-mail is niet gekoppeld.</b> <code>ER_EMAIL_PROVIDER=smtp</code>, maar <code>ER_SMTP_HOST</code> ontbreekt. Verzenden mislukt totdat dit is ingesteld.</span></div>{% endif %}
+
+  <nav class="tabs" aria-label="Outreach">
+    {% for key, (label, _) in tabs.items() %}<a href="/app/outreach?tab={{ key }}"{% if tab == key %} aria-current="page"{% endif %}>{{ label }}{% if counts[key] %} <span class="count">{{ counts[key] }}</span>{% endif %}</a>{% endfor %}
+    <a href="/app/outreach?tab=followups"{% if tab == 'followups' %} aria-current="page"{% endif %}>Opvolging</a>
+    <a href="/app/outreach?tab=responses"{% if tab == 'responses' %} aria-current="page"{% endif %}>Reacties{% if replies %} <span class="count">{{ replies }}</span>{% endif %}</a>
+  </nav>
+
+  <section class="panel">
+    {% set rows = followups if tab == 'followups' else items %}
+    {% if tab == 'responses' %}
+      {% if inbound %}{% for r in inbound %}
+      <a class="msg-row{{ ' unread' if not r.handled }}" href="/app/inbox/{{ r.id }}"><div><div class="from">{{ r.from_name or r.from_email }}{% if r.prospect %} <span class="muted small">· {{ r.prospect.company_name }}</span>{% endif %}</div><div class="subj">{{ r.subject }}</div><div class="snippet">{{ r.body[:180] }}</div></div><div class="side">{{ crm.reply(r.category) }}<span>{{ r.received_at|ago }}</span></div></a>
+      {% endfor %}{% else %}{{ ui.empty('inbox', 'Nog geen reacties', 'Antwoorden op verstuurde e-mails verschijnen hier, geclassificeerd door de Email-agent.', '/app/inbox', 'Naar de inbox') }}{% endif %}
+    {% elif rows %}
+      {% for m in rows %}
+      <a class="msg-row" href="/app/outreach/{{ m.id }}">
+        <div><div class="from">{{ m.to_name or m.to_email }} <span class="muted small">· {{ m.prospect.company_name }}</span> {{ crm.testdata(m.is_test_data) }}</div><div class="subj">{{ m.subject }}</div><div class="snippet">{{ m.body.split('\n', 2)[-1][:200] }}</div>{% if m.error %}<div class="small" data-state="error"><span class="chip critical plain">{{ m.error }}</span></div>{% endif %}</div>
+        <div class="side">{{ crm.outreach_status(m) }}<span>{{ OUTREACH_KIND[m.kind] }} · {{ (m.sent_at or m.created_at)|ago }}</span></div>
+      </a>
+      {% endfor %}
+    {% else %}
+      {% if tab == 'approval' %}{{ ui.empty('check-circle', 'Niets om goed te keuren', 'Nieuwe concept-e-mails van de Outreach-agent verschijnen hier. Start een leadonderzoek, of laat bij een lead een e-mail opstellen.', '/app/leads/find', 'Leads zoeken') }}
+      {% elif tab == 'followups' %}{{ ui.empty('clock', 'Nog geen opvolgberichten', 'Na ' ~ follow_days ~ ' dagen zonder reactie stelt de Follow-up-agent een kort opvolgbericht op, ook ter goedkeuring.') }}
+      {% else %}{{ ui.empty('send', 'Geen berichten', 'Er zijn geen berichten met deze status.') }}{% endif %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

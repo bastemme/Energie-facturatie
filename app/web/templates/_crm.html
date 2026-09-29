@@ -1,0 +1,27 @@
+{% import "_ui.html" as ui with context %}
+
+{% macro unknown(text='ONBEKEND') %}<span class="unknown" data-tip="Niet gevonden in een bron; bewust niet ingevuld" tabindex="0">{{ text }}</span>{% endmacro %}
+
+{% macro stage(s) %}{% set m = STAGES[s] %}{{ ui.chip(m[0], m[1]) }}{% endmacro %}
+
+{% macro qual(q) %}{% if q %}{% set m = QUALIFICATIONS[q] %}{{ ui.chip(m[0], m[1]) }}{% else %}<span class="unknown">Nog niet beoordeeld</span>{% endif %}{% endmacro %}
+
+{% macro outreach_status(m) %}{% set x = OUTREACH[m.status] %}{{ ui.chip(x[0], x[1]) }}{% if m.status.value == 'SENT' %} {{ env(m.delivery == 'live') }}{% endif %}{% endmacro %}
+
+{% macro reply(c) %}{% if c %}{% set m = REPLIES[c] %}{{ ui.chip(m[0], m[1]) }}{% else %}{{ ui.chip('Wordt geclassificeerd', 'quiet') }}{% endif %}{% endmacro %}
+
+{% macro env(live) %}<span class="env-badge {{ 'live' if live else 'mock' }}">{{ 'Live' if live else 'Mock' }}</span>{% endmacro %}
+
+{% macro testdata(flag) %}{% if flag %}<span class="testdata" data-tip="Testbron zonder internet: geen echt bedrijf of persoon" tabindex="0">TESTDATA</span>{% endif %}{% endmacro %}
+
+{% macro dnc(flag) %}{% if flag %}{{ ui.chip('Niet benaderen', 'critical', 'Staat op de suppressielijst: er wordt nooit meer gemaild') }}{% endif %}{% endmacro %}
+
+{% macro co_mono(name) %}{% set clean = name.replace('[TESTDATA]', '').replace('[DEMO', '').strip() %}{% set parts = clean.split() %}<span class="co-mono" aria-hidden="true">{{ ((parts[0][0] if parts else '?') ~ (parts[1][0] if parts|length > 1 else ''))|upper }}</span>{% endmacro %}
+
+{% macro sector_label(key) %}{{ SECTORS[key].label if key in SECTORS else ('Onbekend' if key == 'unknown' else key) }}{% endmacro %}
+
+{% macro contact_short(c) %}{% if c %}<span class="primary">{{ c.full_name or 'Algemeen e-mailadres' }}</span><span class="sub">{{ c.role if c.full_name and c.role else (c.email if not c.full_name else ROLE_CATEGORIES.get(c.role_category, '')) }}</span>{% else %}<span class="unknown">Contact niet gevonden</span>{% endif %}{% endmacro %}
+
+{% macro email_kind(c) %}{% if c.email_type == 'GENERAL_COMPANY_EMAIL' %}<span class="tag" data-tip="Algemeen bedrijfsadres, geen persoonlijk adres" tabindex="0">GENERAL_COMPANY_EMAIL</span>{% elif c.email %}<span class="tag">zakelijk</span>{% endif %}{% endmacro %}
+
+{% macro src(url, label=None) %}{% if url and url.startswith('http') %}<a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ label or url|replace('https://', '')|replace('http://', '')|truncate(48, True, '…') }} {{ icon('external') }}</a>{% elif url %}{{ url }}{% else %}<span class="unknown">bron onbekend</span>{% endif %}{% endmacro %}

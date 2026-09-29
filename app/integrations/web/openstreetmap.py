@@ -19,8 +19,8 @@ def build_query(sector_filters: list[str], area: str, limit: int) -> str:
     area_esc = area.replace("\\", "").replace('"', "")
     selectors = "\n".join(f"  nwr{f}[\"name\"](area.a);" for f in sector_filters)
     return (
-        "[out:json][timeout:40];\n"
-        f'area["name"="{area_esc}"]["boundary"="administrative"]["admin_level"~"^(4|7|8|10)$"]->.a;\n'
+        "[out:json][timeout:90];\n"
+        f'area["name"="{area_esc}"]["boundary"="administrative"]["admin_level"~"^(2|4|7|8|10)$"]->.a;\n'
         f"(\n{selectors}\n);\n"
         f"out center tags {int(limit)};"
     )
@@ -77,4 +77,7 @@ class OpenStreetMapProvider:
             payload = json.loads(resp.text)
         except json.JSONDecodeError as exc:
             raise http.WebAccessError("OpenStreetMap gaf geen geldig antwoord") from exc
+        remark = str(payload.get("remark") or "")
+        if "error" in remark.lower():
+            raise http.WebAccessError(f"OpenStreetMap kon de zoekopdracht niet afronden: {remark[:200]}")
         return parse_elements(payload, sector)[:limit]

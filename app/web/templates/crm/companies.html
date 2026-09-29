@@ -1,0 +1,36 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% block title %}Bedrijven{% endblock %}
+{% block content %}
+<div class="page page-wide">
+  {% call ui.page_head('Bedrijven', 'Alle organisaties: bedrijven in de pijplijn en klanten. Bedrijfsgegevens met bron; wat niet gevonden is, staat als onbekend.') %}
+    <a class="btn" href="/app/clients/new">{{ icon('plus') }}Nieuwe klant</a>
+    <a class="btn btn-primary" href="/app/leads/find">{{ icon('search') }}Leads zoeken</a>
+  {% endcall %}
+  <nav class="tabs"><a href="/app/companies?tab=prospects"{% if tab == 'prospects' %} aria-current="page"{% endif %}>In de pijplijn <span class="count">{{ total }}</span></a><a href="/app/companies?tab=clients"{% if tab == 'clients' %} aria-current="page"{% endif %}>Klanten <span class="count">{{ clients|length }}</span></a></nav>
+  {% if tab == 'prospects' %}
+  <form class="filters" method="get" action="/app/companies"><input type="hidden" name="tab" value="prospects"><label class="sr-only" for="q">Zoeken</label><input id="q" type="search" name="q" value="{{ q }}" placeholder="Zoek op bedrijf of plaats"><label class="sr-only" for="s">Branche</label><select id="s" name="sector"><option value="">Alle branches ({{ total }})</option>{% for key, n in by_sector.items() %}<option value="{{ key }}"{% if sector == key %} selected{% endif %}>{{ crm.sector_label(key) }} ({{ n }})</option>{% endfor %}</select><button class="btn" type="submit">Filteren</button></form>
+  <section class="panel">
+    {% if companies %}<div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Bedrijf</th><th>Branche</th><th>Plaats</th><th>Vestigingen</th><th>KvK</th><th>Contacten</th><th>Bron</th></tr></thead>
+      <tbody>{% for p in companies %}<tr>
+        <td><div class="co-cell">{{ crm.co_mono(p.company_name) }}<div><a class="primary" href="/app/leads/{{ p.id }}">{{ p.company_name }}</a><span class="sub">{{ p.domain or 'website onbekend' }} {{ crm.testdata(p.is_test_data) }}</span></div></div></td>
+        <td data-label="Branche">{{ crm.sector_label(p.sector) }}</td>
+        <td data-label="Plaats">{{ p.city or crm.unknown() }}</td>
+        <td data-label="Vestigingen" class="num">{{ p.locations_count or crm.unknown() }}</td>
+        <td data-label="KvK" class="num">{{ p.kvk_number or crm.unknown() }}</td>
+        <td data-label="Contacten" class="num">{{ p.contacts|length or crm.unknown('Contact niet gevonden') }}</td>
+        <td data-label="Bron" class="small">{{ SOURCES.get(p.source, p.source) }}</td>
+      </tr>{% endfor %}</tbody></table></div>
+    {% else %}{{ ui.empty('clients', 'Geen bedrijven', 'Bedrijven verschijnen hier zodra de Lead Researcher ze vindt of iemand een aanvraag doet.', '/app/leads/find', 'Leads zoeken') }}{% endif %}
+  </section>
+  {% else %}
+  <section class="panel">
+    {% if clients %}<div class="table-wrap"><table class="table stack-sm"><thead><tr><th>Klant</th><th class="r">Facturen</th><th class="r">Mogelijk</th><th class="r">Bevestigd</th><th class="r">Teruggevorderd</th></tr></thead><tbody>
+    {% for c in clients %}{% set s = summaries[c.id] %}<tr><td><a class="primary" href="/app/clients/{{ c.id }}">{{ c.company_name }}</a></td><td class="r num" data-label="Facturen">{{ s.invoices_analyzed }}</td><td class="r num" data-label="Mogelijk">{{ s.potential_discrepancies|eur }}</td><td class="r num" data-label="Bevestigd">{{ s.confirmed_discrepancies|eur }}</td><td class="r num" data-label="Teruggevorderd"><b>{{ s.recovered|eur }}</b></td></tr>{% endfor %}
+    </tbody></table></div>
+    {% else %}{{ ui.empty('clients', 'Nog geen klanten', 'Maak een klant aan zodra een lead facturen wil laten controleren.', '/app/clients/new', 'Klant aanmaken') }}{% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

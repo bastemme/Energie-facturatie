@@ -46,12 +46,43 @@ def _sync_agents() -> None:
         sync_agents(db)
 
 
+def _start_inbox_poller() -> None:
+    """With a live mailbox, let the Email agent read it every few minutes (the worker CLI does the same)."""
+    import threading
+    import time
+
+    from app.integrations.email.provider import get_email_provider, provider_status
+
+    settings = get_settings()
+    if settings.environment == "test" or not settings.agents_autorun:
+        return
+    if not (get_email_provider().is_live and provider_status()["can_read"]):
+        return
+
+    def loop() -> None:
+        from app.agents.queue import enqueue
+        from app.agents.runner import kick
+        from app.db import session_scope
+
+        while True:
+            time.sleep(settings.inbox_poll_minutes * 60)
+            try:
+                with session_scope() as db:
+                    enqueue(db, "email", "fetch_inbox", {}, title="Mailbox lezen (automatisch)", priority=4)
+                kick()
+            except Exception:
+                logging.getLogger("app").exception("inbox poll failed")
+
+    threading.Thread(target=loop, name="inbox-poller", daemon=True).start()
+
+
 def create_app(database_url: str | None = None) -> FastAPI:
     settings = get_settings()
     configure_logging()
     init_engine(database_url)
     create_all()
     _sync_agents()
+    _start_inbox_poller()
 
     app = FastAPI(title="Energy Invoice Recovery", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(
@@ -108,11 +139,13 @@ def create_app(database_url: str | None = None) -> FastAPI:
         routes_auth,
         routes_cases,
         routes_clients,
+        routes_crm,
         routes_ops,
         routes_public,
         routes_review,
     )
 
-    for module in (routes_public, routes_auth, routes_clients, routes_review, routes_cases, routes_admin, routes_ops):
+    for module in (routes_public, routes_auth, routes_clients, routes_review, routes_cases, routes_admin, routes_ops,
+                   routes_crm):
         app.include_router(module.router)
     return app

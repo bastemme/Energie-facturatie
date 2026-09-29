@@ -63,7 +63,21 @@ def create_all() -> None:
 
     engine = get_engine()
     Base.metadata.create_all(engine)
-    add_missing_columns(engine)
+    if add_missing_columns(engine):
+        _backfill_defaults(engine)
+
+
+def _backfill_defaults(engine: Engine) -> None:
+    """Give rows that predate a new column its default value (dialect-neutral Core updates)."""
+    from sqlalchemy import update
+
+    from app.domain.enums import LeadStage
+    from app.models import Prospect
+
+    table = Prospect.__table__
+    with engine.begin() as conn:
+        conn.execute(update(table).where(table.c.stage.is_(None)).values(stage=LeadStage.NEW.value))
+        conn.execute(update(table).where(table.c.do_not_contact.is_(None)).values(do_not_contact=False))
 
 
 def add_missing_columns(engine: Engine) -> list[str]:

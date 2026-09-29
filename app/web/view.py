@@ -324,5 +324,58 @@ def meter_bar(value: Decimal, maximum: Decimal, cls: str = "") -> Markup:
                   f'{fill}</svg>')
 
 
+def funnel_bar(count: int, top: int, idx: int) -> Markup:
+    """One funnel step: a centred bar whose width follows the count (with a visible minimum)."""
+    pct = 0.0 if not top else max(4.0 if count else 1.5, min(100.0, count / top * 100))
+    x = (100 - pct) / 2
+    return Markup(f'<svg class="fbar s{idx}" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">'
+                  f'<rect x="{x:.2f}" y="0" width="{pct:.2f}" height="10" rx="1.4"/></svg>')
+
+
+def progress_bar(done: int | None, total: int | None, cls: str = "") -> Markup:
+    pct = 0.0 if not total else max(0.0, min(100.0, (done or 0) / total * 100))
+    return Markup(f'<svg class="pbar {cls}" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true">'
+                  f'<rect class="track" x="0" y="0" width="100" height="6" rx="3"/>'
+                  + (f'<rect class="fill" x="0" y="0" width="{pct:.2f}" height="6" rx="3"/>' if pct else "")
+                  + "</svg>")
+
+
+def column_chart(points: list[tuple[str, int]], label: str) -> Markup:
+    """Small count chart (e.g. leads per week), with round ticks."""
+    W, H, L, R, T, B = 560, 170, 30, 6, 10, 24
+    top_v = max((v for _, v in points), default=0)
+    ticks = nice_ticks(float(top_v) if top_v else 1.0, 3)
+    ticks = sorted({int(t) for t in ticks})
+    top = ticks[-1] or 1
+    pw, ph = W - L - R, H - T - B
+    slot = pw / max(len(points), 1)
+    bw = min(28, slot * 0.55)
+    out = [f'<svg class="chart" viewBox="0 0 {W} {H}" role="img" aria-label="{escape(label)}">']
+    for v in ticks:
+        y = T + ph - ph * v / top
+        out.append(f'<line class="grid-line" x1="{L}" x2="{W - R}" y1="{y:.1f}" y2="{y:.1f}"/>'
+                   f'<text x="{L - 8}" y="{y + 4:.1f}" text-anchor="end">{v}</text>')
+    for i, (name, v) in enumerate(points):
+        h = ph * v / top
+        x = L + slot * i + (slot - bw) / 2
+        r = min(4, h / 2, bw / 2)
+        y = T + ph - h
+        path = (f"M{x:.1f},{T + ph:.1f} V{y + r:.1f} Q{x:.1f},{y:.1f} {x + r:.1f},{y:.1f} H{x + bw - r:.1f} "
+                f"Q{x + bw:.1f},{y:.1f} {x + bw:.1f},{y + r:.1f} V{T + ph:.1f} Z") if h > 0 else ""
+        out.append(f'<g class="col"><title>{escape(name)}: {v}</title>'
+                   + (f'<path class="bar brand" d="{path}"/>' if path else "")
+                   + f'<text x="{x + bw / 2:.1f}" y="{H - 7}" text-anchor="middle">{escape(name)}</text></g>')
+    out.append(f'<line class="axis" x1="{L}" x2="{W - R}" y1="{T + ph}" y2="{T + ph}"/></svg>')
+    return Markup("".join(out))
+
+
+def hbar(value: float, maximum: float, cls: str = "") -> Markup:
+    pct = 0.0 if not maximum else max(0.0, min(100.0, value / maximum * 100))
+    return Markup(f'<svg class="hbar {cls}" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">'
+                  f'<rect class="track" x="0" y="0" width="100" height="8" rx="2"/>'
+                  + (f'<rect class="fill" x="0" y="0" width="{pct:.2f}" height="8" rx="2"/>' if pct else "")
+                  + "</svg>")
+
+
 def month_label(d: date | None) -> str:
     return f"{MONTHS[d.month - 1]} {d.year}" if d else "—"

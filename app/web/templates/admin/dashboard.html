@@ -1,9 +1,9 @@
 {% extends "app_base.html" %}
-{% block title %}Overzicht{% endblock %}
+{% block title %}Analyses{% endblock %}
 {% block content %}
 <div class="page">
-  {% call ui.page_head('Overzicht', 'Alle klanten samen. Bedragen excl. btw, overlappende bevindingen niet dubbel geteld.') %}
-    <a class="btn" href="/app/clients/new">{{ icon('plus') }}Nieuwe klant</a>
+  {% call ui.page_head('Analyses', 'Bevindingen uit de controleregels van alle klanten, van mogelijk tot teruggevorderd. Bedragen excl. btw, overlappende bevindingen niet dubbel geteld.') %}
+    <a class="btn" href="/app/invoices">{{ icon('upload') }}Facturen uploaden</a>
     <a class="btn btn-primary" href="/app/review">{{ icon('review') }}Beoordelen{% if queue_total %} ({{ queue_total }}){% endif %}</a>
   {% endcall %}
 
@@ -15,7 +15,7 @@
   <div class="grid-3-1">
     <section class="section">
       <div class="section-head"><h2>Wacht op beoordeling <span class="muted">{{ queue_total }}</span></h2>{% if queue_total > queue|length %}<a href="/app/review">Alle {{ queue_total }} bekijken {{ icon('arrow-right') }}</a>{% endif %}</div>
-      {% if queue %}<div class="findings">{% for a in queue %}{{ ui.finding_card(a, '/app/admin', clients.get(a.client_id)) }}{% endfor %}</div>
+      {% if queue %}<div class="findings">{% for a in queue %}{{ ui.finding_card(a, '/app/analyses', clients.get(a.client_id)) }}{% endfor %}</div>
       {% else %}<div class="panel">{{ ui.empty('check-circle', 'De wachtrij is leeg', 'Alle bevindingen zijn beoordeeld. Nieuwe analyses verschijnen hier automatisch.') }}</div>{% endif %}
     </section>
     <div class="stack-lg">
@@ -75,6 +75,6 @@
     </div>
   </details>
   {% endif %}
-  {{ ui.review_dialog('/app/admin') }}
+  {{ ui.review_dialog('/app/analyses') }}
 </div>
 {% endblock %}

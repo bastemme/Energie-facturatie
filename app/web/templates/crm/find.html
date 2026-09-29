@@ -1,0 +1,43 @@
+{% extends "app_base.html" %}
+{% block title %}Leads zoeken{% endblock %}
+{% block content %}
+<div class="page">
+  {{ ui.page_head('Leads zoeken', 'De Lead Researcher zoekt bestaande bedrijven in openbare bronnen, leest hun eigen website en legt elk bedrijf vast met bron. Daarna kwalificeren, contacten zoeken en concept-e-mails opstellen: alles ter goedkeuring.', [('Leads', '/app/leads')]) }}
+
+  {% if provider.is_test_data %}
+  <div class="alert review">{{ icon('alert') }}<span><span class="env-badge mock">Mock</span> <b>Live onderzoek staat uit.</b> De onderzoeksbron is de testbron (<code>ER_RESEARCH_PROVIDER=mock</code>): resultaten zijn als TESTDATA gemarkeerd en geen echte bedrijven. Zet <code>ER_RESEARCH_PROVIDER=openstreetmap</code> voor echte bedrijven.</span></div>
+  {% else %}
+  <div class="alert info">{{ icon('globe') }}<span><span class="env-badge live">Live</span> <b>Echte bedrijven</b> uit {{ provider.label }} (© OpenStreetMap-bijdragers, ODbL) en hun eigen website. Dit vraagt internettoegang; lukt het niet, dan ziet u bij de taak waarom.</span></div>
+  {% endif %}
+
+  <form method="post" action="/app/leads/find" class="panel" data-no-loading>
+    {{ ui.csrf_field() }}
+    <div class="form-section">
+      <h3>Wat zoekt u?</h3>
+      <div class="fields">
+        <div class="field"><label for="target">Aantal bedrijven</label><input id="target" name="target" type="number" min="1" max="{{ max_limit }}" value="25" required><span class="hint">Meer dan {{ threshold }} vraagt eerst goedkeuring.</span></div>
+        <div class="field"><label for="country">Land</label><select id="country" name="country"><option value="NL" selected>Nederland</option></select><span class="hint">Alleen Nederlandse bedrijven (B2B).</span></div>
+        <div class="field"><label for="area">Regio <span class="muted">(optioneel)</span></label><input id="area" name="area" type="text" maxlength="80" placeholder="Leeg = heel Nederland, of bijv. Noord-Brabant, Tilburg"><span class="hint">Officiële naam van provincie of gemeente.</span></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <h3>Branche</h3>
+      <p>Bedrijven die plausibel in aanmerking komen voor een controle van energiefacturen. Een branche zegt niets over het werkelijke verbruik van een bedrijf; dat blijft onbekend tot we facturen zien.</p>
+      <div class="sector-pick">{% for key, label, members in presets %}<label><input type="radio" name="preset" value="{{ key }}"{% if loop.first %} checked{% endif %}><span><b>{{ label }}</b><span>{{ members }}</span></span></label>{% endfor %}<label><input type="radio" name="preset" value=""><span><b>Zelf kiezen</b><span>Kies hieronder één of meer branches</span></span></label></div>
+      <details class="disclose"><summary class="small">{{ icon('arrow-right') }} Losse branches kiezen</summary>
+        <div class="sector-pick mt-s">{% for s in sectors %}<label><input type="checkbox" name="sectors" value="{{ s.key }}"><span><b>{{ s.label }}</b><span>{{ s.why }}</span></span></label>{% endfor %}</div>
+      </details>
+    </div>
+    <div class="form-section">
+      <h3>Criteria</h3>
+      <div class="fields">
+        <div class="field"><label for="min_locations">Minimale omvang</label><select id="min_locations" name="min_locations"><option value="1">Alle bedrijven</option><option value="2">Minimaal 2 vestigingen</option><option value="3">Minimaal 3 vestigingen</option><option value="5">Minimaal 5 vestigingen</option></select><span class="hint">Alleen als de eigen website dit noemt; anders onbekend en niet meegenomen.</span></div>
+        <div class="field"><label for="criteria">Aanvullende criteria <span class="muted">(optioneel)</span></label><input id="criteria" name="criteria" type="text" maxlength="300" placeholder="Bijv. koeling, productie"><span class="hint">Trefwoorden die op de website moeten staan, gescheiden door komma's.</span></div>
+      </div>
+      <label class="check"><input type="checkbox" name="require_website" checked><span>Alleen bedrijven met een eigen website (nodig om een beslisser te vinden)</span></label>
+      <label class="check"><input type="checkbox" name="workflow" checked><span>Daarna automatisch door de workflow: kwalificeren (drempel {{ qualify }}), beslissers zoeken en concept-e-mails opstellen. Er wordt niets verstuurd zonder uw goedkeuring.</span></label>
+    </div>
+    <div class="form-foot"><a class="btn" href="/app/leads">Annuleren</a><button class="btn btn-primary" type="submit">{{ icon('search') }}Leads zoeken</button></div>
+  </form>
+</div>
+{% endblock %}

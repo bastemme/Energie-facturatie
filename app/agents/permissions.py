@@ -17,6 +17,7 @@ PERMISSIONS: dict[str, str] = {
     "contacts.research": "Zakelijke contactgegevens onderzoeken",
     "outreach.draft": "Benaderingsberichten opstellen",
     "email.send": "E-mail versturen (altijd na menselijke goedkeuring)",
+    "email.read": "Binnenkomende e-mail lezen en classificeren",
     "documents.read": "Klantdocumenten lezen",
     "invoices.read": "Factuurgegevens lezen",
     "invoices.write": "Factuurgegevens vastleggen",

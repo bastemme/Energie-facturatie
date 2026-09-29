@@ -1,0 +1,45 @@
+{% extends "app_base.html" %}
+{% import "_crm.html" as crm with context %}
+{% block title %}Inbox{% endblock %}
+{% block content %}
+<div class="page">
+  {% call ui.page_head('Inbox', 'Reacties op onze e-mails. De Email-agent classificeert elk bericht, werkt de lead bij en stelt zo nodig een antwoord op, dat u eerst goedkeurt.') %}
+    {{ crm.env(mail.live) }}
+    <button class="btn" type="button" data-dialog-open="register-dialog">{{ icon('plus') }}Antwoord registreren</button>
+    <form method="post" action="/app/inbox/fetch" class="inline">{{ ui.csrf_field() }}<button class="btn btn-primary" type="submit"{% if not mail.can_read %} disabled{% endif %}>{{ icon('inbox') }}Mailbox lezen</button></form>
+  {% endcall %}
+
+  {% if not mail.live %}<div class="alert review">{{ icon('info') }}<span><span class="env-badge mock">Mock</span> <b>Testmailbox.</b> Er komt geen echte e-mail binnen. Open een verstuurde e-mail onder Outreach en kies <i>Antwoord simuleren</i>, of registreer een antwoord handmatig.</span></div>
+  {% elif not mail.can_read %}<div class="alert critical">{{ icon('alert') }}<span><b>Mailbox niet gekoppeld.</b> Stel <code>ER_IMAP_HOST</code>, <code>ER_IMAP_USER</code> en <code>ER_IMAP_PASSWORD</code> in om antwoorden automatisch te lezen.</span></div>{% endif %}
+
+  <nav class="seg" aria-label="Filter">
+    <a href="/app/inbox?show=open"{% if show == 'open' and not category %} aria-current="page"{% endif %}>Ongelezen <span class="n">{{ nav.inbox }}</span></a>
+    <a href="/app/inbox?show=all"{% if show != 'open' and not category %} aria-current="page"{% endif %}>Alle <span class="n">{{ total }}</span></a>
+    {% for cat in categories %}<a href="/app/inbox?show=all&category={{ cat.value }}"{% if category == cat.value %} aria-current="page"{% endif %}>{{ REPLIES[cat][0] }} <span class="n">{{ counts.get(cat, 0) }}</span></a>{% endfor %}
+  </nav>
+
+  <section class="panel">
+    {% if items %}{% for r in items %}
+    <a class="msg-row{{ ' unread' if not r.handled }}" href="/app/inbox/{{ r.id }}">
+      <div><div class="from">{{ r.from_name or r.from_email }}{% if r.prospect %} <span class="muted small">· {{ r.prospect.company_name }}</span>{% else %} <span class="small muted">· niet gekoppeld aan een lead</span>{% endif %} {% if r.source == 'mock' %}{{ crm.env(False) }}{% endif %}</div>
+        <div class="subj">{{ r.subject }}</div><div class="snippet">{{ r.body[:200] }}</div></div>
+      <div class="side">{{ crm.reply(r.category) }}{% if r.id in drafts %}<span>{{ crm.outreach_status(drafts[r.id]) }}</span>{% endif %}<span>{{ r.received_at|ago }}</span></div>
+    </a>
+    {% endfor %}
+    {% else %}{{ ui.empty('inbox', 'Geen berichten' if show != 'open' else 'Alles gelezen', 'Nieuwe reacties verschijnen hier zodra de Email-agent de mailbox heeft gelezen.') }}{% endif %}
+  </section>
+
+  <dialog id="register-dialog" aria-labelledby="rg-title">
+    <form method="post" action="/app/inbox/register" data-no-loading>
+      {{ ui.csrf_field() }}
+      <div class="dialog-head"><h2 id="rg-title">Antwoord registreren</h2><p>Plak een reactie die buiten de gekoppelde mailbox binnenkwam. De Email-agent classificeert hem en werkt de lead bij.</p></div>
+      <div class="dialog-body">
+        <div class="fields"><div class="field"><label for="rg-from">Afzender (e-mailadres)</label><input id="rg-from" name="from_email" type="email" required></div><div class="field"><label for="rg-name">Naam</label><input id="rg-name" name="from_name" type="text"></div></div>
+        <div class="field"><label for="rg-subj">Onderwerp</label><input id="rg-subj" name="subject" type="text"></div>
+        <div class="field"><label for="rg-body">Bericht</label><textarea id="rg-body" name="body" required></textarea></div>
+      </div>
+      <div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Annuleren</button><button class="btn btn-primary" type="submit">Registreren</button></div>
+    </form>
+  </dialog>
+</div>
+{% endblock %}
