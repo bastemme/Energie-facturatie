@@ -15,21 +15,21 @@
 
   <section class="ops-strip" aria-label="Status">
     <div class="ops-live"><b>Command center</b><span><i class="pulse-dot"></i>Live · {{ c.operational }} van {{ c.total }} agents operationeel</span></div>
-    <div class="ops-metric"><span class="n">{{ c.running }}</span><span class="l">Actief</span></div>
-    <div class="ops-metric"><span class="n">{{ c.queued }}</span><span class="l">In wachtrij</span></div>
-    <div class="ops-metric{{ ' warn' if nav.approve }}"><span class="n">{{ nav.approve }}</span><span class="l">E-mails te beoordelen</span></div>
-    <div class="ops-metric{{ ' warn' if c.approvals }}"><span class="n">{{ c.approvals }}</span><span class="l">Taken te beoordelen</span></div>
-    <div class="ops-metric"><span class="n">{{ nav.inbox }}</span><span class="l">Ongelezen reacties</span></div>
-    <div class="ops-metric{{ ' bad' if c.failed }}"><span class="n">{{ c.failed }}</span><span class="l">Agent in fout</span></div>
+    <div class="ops-metric"><span class="n">{{ ui.num(c.running, 'ops-running') }}</span><span class="l">Actief</span></div>
+    <div class="ops-metric"><span class="n">{{ ui.num(c.queued, 'ops-queued') }}</span><span class="l">In wachtrij</span></div>
+    <div class="ops-metric{{ ' warn' if nav.approve }}"><span class="n">{{ ui.num(nav.approve, 'ops-approve') }}</span><span class="l">E-mails te beoordelen</span></div>
+    <div class="ops-metric{{ ' warn' if c.approvals }}"><span class="n">{{ ui.num(c.approvals, 'ops-approvals') }}</span><span class="l">Taken te beoordelen</span></div>
+    <div class="ops-metric"><span class="n">{{ ui.num(nav.inbox, 'ops-inbox') }}</span><span class="l">Ongelezen reacties</span></div>
+    <div class="ops-metric{{ ' bad' if c.failed }}"><span class="n">{{ ui.num(c.failed, 'ops-failed') }}</span><span class="l">Agent in fout</span></div>
   </section>
 
   <section class="section" aria-label="Pijplijn">
     <div class="section-head"><h2>Leadgeneratie-pijplijn</h2><a href="/app/leads">Alle leads {{ icon('arrow-right') }}</a></div>
-    <ol class="pipe">
+    <ol class="pipe{{ ' flowing' if pipeline|selectattr('active')|list }}">
       {% for s in pipeline %}
       <li class="{{ 'human' if s.actor == 'human' }}{{ ' active' if s.active }}{{ ' attn' if s.key == 'approval' and s.count }}"><a href="{{ s.href }}">
         <span class="p-step">{{ s.label }}</span>
-        <span class="p-n">{{ s.count }}</span>
+        <span class="p-n">{{ ui.num(s.count, 'pipe-' ~ s.key) }}</span>
         <span class="p-note">{{ s.note }}</span>
         <span class="p-actor">{% if s.actor == 'human' %}{{ icon('user') }}Mens{% else %}{{ icon('bolt') }}{{ d.names.get(s.actor, s.actor) }}{% endif %}</span>
       </a></li>
@@ -86,9 +86,19 @@
         {% for card in cards %}{% set a = card.agent %}
         <a class="agent-card s-{{ card.state }}" href="/app/ops/agents/{{ a.id }}">
           <div class="ag-head">{{ ops.mono(a.name) }}<div><div class="ag-name">{{ a.name }}</div><div class="ag-role">{{ a.role }}</div></div></div>
-          <div class="ag-now">{% if card.current_task %}{{ card.current_task.title }}{% elif card.state == 'planned' %}<span class="muted">{{ a.description }}</span>{% elif card.last_activity %}<span class="muted">{{ card.last_activity.message }}</span>{% else %}<span class="muted">Nog niet gedraaid</span>{% endif %}</div>
+          <div class="ag-activity">
+            {% if card.current_task and card.state == 'running' %}
+            <div class="verb running"><i></i><span>{{ card.current_task.title }}</span></div>
+            <div class="step">{{ card.step or 'Gestart' }}{% if card.progress %} · {{ card.progress[0] }} / {{ card.progress[1] }}{% endif %}</div>
+            {% if card.progress %}{{ progress_bar(card.progress[0], card.progress[1]) }}{% endif %}
+            {% elif card.state == 'planned' %}<div class="step">{{ a.description }}</div>
+            {% else %}
+            <div class="verb {{ card.state if card.last_activity or card.state != 'idle' else 'never' }}"><i></i><span>{% if card.state == 'queued' %}{{ card.queued }} {{ 'taak' if card.queued == 1 else 'taken' }} in wachtrij{% elif card.state == 'waiting' %}Wacht op uw beoordeling{% elif card.state == 'failed' %}Laatste taak mislukt{% elif card.last_activity %}Laatst: {{ card.last_activity.created_at|ago }}{% else %}Nog niet gedraaid{% endif %}</span></div>
+            <div class="step">{% if card.last_activity %}{{ card.last_activity.message }}{% else %}{{ a.description }}{% endif %}</div>
+            {% endif %}
+          </div>
           {% if card.state != 'planned' %}<div class="ag-stats"><span><b>{{ card.completed }}</b> afgerond</span><span class="{{ 'err' if card.failed }}"><b>{{ card.failed }}</b> fouten</span><span>{% if a.last_run_at %}{{ a.last_run_at|ago }}{% else %}nooit gedraaid{% endif %}</span></div>{% endif %}
-          <div class="ag-foot">{{ ops.state(card.state) }}<span>{% if card.queued %}{{ card.queued }} in wachtrij{% endif %}</span></div>
+          <div class="ag-foot"><span class="state {{ card.state }}" data-state-key="agent-{{ a.id }}">{{ card.status_word }}</span><span>{% if card.queued and card.state != 'queued' %}{{ card.queued }} in wachtrij{% endif %}</span></div>
         </a>
         {% endfor %}
       </div>

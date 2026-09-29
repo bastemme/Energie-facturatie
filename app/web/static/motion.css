@@ -1,0 +1,289 @@
+/* ==========================================================================
+   Factuurspoor motion system. See docs/motion-design-system.md.
+   Fast, precise, quiet. Motion explains a relationship, guides attention,
+   confirms an action or establishes hierarchy; otherwise it is not here.
+   Only transform and opacity are animated (plus colour on hover), so
+   everything stays on the compositor.
+   ========================================================================== */
+
+:root {
+  /* Durations */
+  --m-instant: 90ms;   /* press feedback, tooltips */
+  --m-fast: 140ms;     /* hover, focus, small state changes */
+  --m-base: 220ms;     /* enter/exit of components, tabs, dialogs */
+  --m-slow: 360ms;     /* larger surfaces, drawers, chart draw per element */
+  --m-story: 640ms;    /* storytelling steps (landing only) */
+  --stagger: 36ms;     /* delay between siblings in a sequence (max 8 steps) */
+  /* Easing */
+  --e-out: cubic-bezier(.16, 1, .3, 1);      /* entering: fast start, soft landing */
+  --e-std: cubic-bezier(.2, .7, .2, 1);      /* state changes */
+  --e-in: cubic-bezier(.5, 0, .75, 0);       /* leaving */
+  --e-inout: cubic-bezier(.65, 0, .35, 1);   /* moving between two places */
+  /* Distances */
+  --lift: 6px;         /* entrance offset */
+}
+
+/* ------------------------------------------------------------------ page transitions */
+/* Cross-document view transitions (progressive: browsers without support just navigate). */
+@view-transition { navigation: auto; }
+.sidebar { view-transition-name: sidebar; }
+.topbar { view-transition-name: topbar; }
+.site-header { view-transition-name: site-header; }
+::view-transition-old(root) { animation: var(--m-fast) var(--e-in) both vt-out; }
+::view-transition-new(root) { animation: var(--m-base) var(--e-out) both vt-in; }
+@keyframes vt-out { to { opacity: 0; } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(4px); } }
+
+/* Page content settles in once per navigation (not on live updates). */
+.main > .page { animation: rise-in var(--m-base) var(--e-out) both; }
+html.no-enter .main > .page { animation: none; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(var(--lift)); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+
+/* Navigation progress: a thin brand line while the next page loads. */
+.nav-progress { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 100; pointer-events: none;
+  background: var(--brand); transform-origin: 0 50%; transform: scaleX(0); opacity: 0; }
+.nav-progress.go { opacity: 1; transform: scaleX(.72); transition: transform 1.6s var(--e-out), opacity var(--m-fast); }
+.nav-progress.done { opacity: 0; transform: scaleX(1); transition: transform var(--m-fast) var(--e-out), opacity var(--m-base) var(--m-fast); }
+
+/* ------------------------------------------------------------------ entrance sequences */
+/* Above the fold: CSS-only sequences (no flash, work without JS). */
+.figures > *, .ops-strip > *, .pipe > li, .agent-grid > *, .findings > *, .feed > li,
+.tasklist > li, .figures-kpi > * { animation: rise-in var(--m-slow) var(--e-out) both; }
+.figures > :nth-child(2), .ops-strip > :nth-child(2), .pipe > li:nth-child(2), .agent-grid > :nth-child(2),
+.findings > :nth-child(2), .feed > li:nth-child(2), .tasklist > li:nth-child(2) { animation-delay: calc(1 * var(--stagger)); }
+.figures > :nth-child(3), .ops-strip > :nth-child(3), .pipe > li:nth-child(3), .agent-grid > :nth-child(3),
+.findings > :nth-child(3), .feed > li:nth-child(3), .tasklist > li:nth-child(3) { animation-delay: calc(2 * var(--stagger)); }
+.figures > :nth-child(4), .ops-strip > :nth-child(4), .pipe > li:nth-child(4), .agent-grid > :nth-child(4),
+.findings > :nth-child(4), .feed > li:nth-child(4), .tasklist > li:nth-child(4) { animation-delay: calc(3 * var(--stagger)); }
+.figures > :nth-child(5), .ops-strip > :nth-child(5), .pipe > li:nth-child(5), .agent-grid > :nth-child(5),
+.findings > :nth-child(5), .feed > li:nth-child(5), .tasklist > li:nth-child(5) { animation-delay: calc(4 * var(--stagger)); }
+.ops-strip > :nth-child(6), .pipe > li:nth-child(6), .agent-grid > :nth-child(6), .feed > li:nth-child(6),
+.tasklist > li:nth-child(6) { animation-delay: calc(5 * var(--stagger)); }
+.ops-strip > :nth-child(7), .pipe > li:nth-child(7), .agent-grid > :nth-child(7), .feed > li:nth-child(7) { animation-delay: calc(6 * var(--stagger)); }
+.pipe > li:nth-child(8), .agent-grid > :nth-child(n+8), .feed > li:nth-child(n+8) { animation-delay: calc(7 * var(--stagger)); }
+html.no-enter .figures > *, html.no-enter .ops-strip > *, html.no-enter .pipe > li, html.no-enter .agent-grid > *,
+html.no-enter .findings > *, html.no-enter .feed > li, html.no-enter .tasklist > li { animation: none; }
+
+/* Below the fold: revealed once when scrolled into view (JS adds .is-in; without JS it is simply visible). */
+html.js [data-reveal]:not(.is-in) { opacity: 0; transform: translateY(12px); }
+html.js [data-reveal] { transition: opacity var(--m-slow) var(--e-out), transform var(--m-slow) var(--e-out);
+  transition-delay: calc(var(--i, 0) * var(--stagger)); }
+
+/* ------------------------------------------------------------------ buttons & controls */
+.btn { transition: background var(--m-fast) var(--e-std), border-color var(--m-fast) var(--e-std),
+  box-shadow var(--m-fast) var(--e-std), transform var(--m-instant) var(--e-std), color var(--m-fast) var(--e-std); }
+.btn:active { transform: translateY(1px) scale(.985); transition-duration: 60ms; }
+@media (hover: hover) {
+  .btn-primary:hover { box-shadow: 0 2px 6px -1px rgba(29, 51, 179, .4), inset 0 1px 0 rgba(255, 255, 255, .14); }
+}
+.btn.is-loading { transition: opacity var(--m-fast); }
+.btn svg { transition: transform var(--m-fast) var(--e-out); }
+@media (hover: hover) { .btn:hover svg.i:only-child, a.btn:hover > svg:last-child:not(:first-child) { transform: translateX(2px); } }
+:focus-visible { transition: box-shadow var(--m-fast) var(--e-out); }
+input, select, textarea { transition: border-color var(--m-fast) var(--e-std), box-shadow var(--m-fast) var(--e-std),
+  background var(--m-fast) var(--e-std), width var(--m-base) var(--e-out); }
+.check input, .sector-pick input { transition: transform var(--m-instant) var(--e-std); }
+.check input:active, .sector-pick input:active { transform: scale(.9); }
+.sector-pick label:has(input:checked) { animation: select-in var(--m-base) var(--e-out); }
+@keyframes select-in { from { box-shadow: 0 0 0 4px var(--brand-soft); } }
+
+/* ------------------------------------------------------------------ navigation */
+.nav a { position: relative; }
+.nav a::before { content: ""; position: absolute; left: -16px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px;
+  background: var(--brand); transform: scaleY(0); transition: transform var(--m-base) var(--e-out); }
+.nav a[aria-current="page"]::before { transform: scaleY(1); }
+.nav a svg { transition: color var(--m-fast) var(--e-std), transform var(--m-fast) var(--e-out); }
+@media (hover: hover) { .nav a:hover svg { color: var(--ink-2); } }
+.nav .count { transition: color var(--m-fast); }
+.count.changed, .tabs .count.changed { animation: count-pop var(--m-slow) var(--e-out); }
+@keyframes count-pop { 30% { transform: scale(1.18); } }
+
+/* Mobile drawer: slides, the scrim fades. */
+@media (max-width: 900px) {
+  .sidebar { display: flex; position: fixed; inset: 0 auto 0 0; width: min(300px, 86vw); z-index: 50; height: 100%;
+    overflow-y: auto; background: var(--surface); box-shadow: var(--shadow-3); transform: translateX(-102%);
+    visibility: hidden; transition: transform var(--m-slow) var(--e-out), visibility 0s linear var(--m-slow); }
+  .sidebar.open { transform: none; visibility: visible; transition: transform var(--m-slow) var(--e-out), visibility 0s; }
+  .scrim { opacity: 0; transition: opacity var(--m-base) var(--e-std); }
+  .scrim.show { opacity: 1; }
+  .nav a::before { left: -12px; }
+}
+
+/* ------------------------------------------------------------------ tabs, segments, filters */
+.tabs a::after { content: ""; position: absolute; left: var(--s3); right: var(--s3); bottom: -1px; height: 2px;
+  border-radius: 2px; background: var(--brand); transform: scaleX(0); transition: transform var(--m-base) var(--e-out),
+  background var(--m-fast); }
+.tabs a[aria-current="page"]::after { transform: scaleX(1); }
+@media (hover: hover) { .tabs a:not([aria-current="page"]):hover::after { transform: scaleX(1); background: var(--line-2); } }
+.tabs a { transition: color var(--m-fast) var(--e-std); }
+.seg a { transition: background var(--m-fast) var(--e-std), color var(--m-fast) var(--e-std),
+  border-color var(--m-fast) var(--e-std), transform var(--m-instant) var(--e-std); }
+.seg a:active { transform: scale(.97); }
+.filters select.is-set, .filters input.is-set { border-color: var(--brand-line); background-color: #f8f9ff; }
+.filters input[type=search]:focus { width: 320px; }
+@media (max-width: 640px) { .filters input[type=search]:focus { width: 100%; } }
+
+/* ------------------------------------------------------------------ tables, rows, cards */
+.table tbody tr { transition: background var(--m-fast) var(--e-std); }
+.table tbody tr:has(a.primary) { cursor: default; }
+.table a.primary { transition: color var(--m-fast) var(--e-std); }
+@media (hover: hover) {
+  a.panel, .msg-row, .f-row, .pipe a, .sector-pick label, .contact-card, a.agent-card {
+    transition: background var(--m-fast) var(--e-std), border-color var(--m-fast) var(--e-std),
+      box-shadow var(--m-base) var(--e-out), transform var(--m-base) var(--e-out); }
+  a.panel:hover { text-decoration: none; border-color: var(--line-2); box-shadow: var(--shadow-2); transform: translateY(-1px); }
+  .tasklist a:hover .t-icon { transform: translateX(1px); }
+  .finding:hover { transform: translateY(-1px); }
+}
+.finding { transition: border-color var(--m-fast) var(--e-std), box-shadow var(--m-base) var(--e-out),
+  transform var(--m-base) var(--e-out); }
+.tasklist .t-icon { transition: transform var(--m-fast) var(--e-out); }
+
+/* ------------------------------------------------------------------ disclosure, dialogs, tooltips, toasts */
+details[open] > :not(summary) { animation: disclose-in var(--m-base) var(--e-out); }
+@keyframes disclose-in { from { opacity: 0; transform: translateY(-4px); } }
+dialog[open] { animation: dialog-in var(--m-base) var(--e-out); }
+dialog[open]::backdrop { animation: fade-in var(--m-base) var(--e-std); }
+dialog.closing { animation: dialog-out var(--m-fast) var(--e-in) forwards; }
+dialog.closing::backdrop { animation: fade-out var(--m-fast) var(--e-in) forwards; }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+@keyframes dialog-out { to { opacity: 0; transform: translateY(4px) scale(.99); } }
+[data-tip]:hover::after, [data-tip]:focus-visible::after { animation: tip-in var(--m-fast) var(--e-out) 60ms both; }
+@keyframes tip-in { from { opacity: 0; transform: translate(-50%, 3px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.toast { animation: toast-in var(--m-slow) var(--e-out); }
+.toast.leaving { transition: opacity var(--m-base) var(--e-in), transform var(--m-base) var(--e-in); }
+
+/* ------------------------------------------------------------------ feedback: success, error, change */
+/* Success: the check draws itself once. */
+.toast.success svg path, .alert.positive > svg path, .check-draw path { stroke-dasharray: 24; stroke-dashoffset: 24;
+  animation: draw-check var(--m-slow) var(--e-out) 120ms forwards; }
+.toast.success svg circle, .alert.positive > svg circle { animation: fade-in var(--m-base) var(--e-std); }
+@keyframes draw-check { to { stroke-dashoffset: 0; } }
+/* Error: one short, horizontal nudge; never a shake loop. */
+.alert.critical, .toast.error { animation: nudge var(--m-slow) var(--e-std); }
+@keyframes nudge { 20% { transform: translateX(-3px); } 45% { transform: translateX(2px); } 70% { transform: translateX(-1px); } }
+/* A value or status that changed since the last view: a brief tint that fades. */
+.changed { animation: changed 1.4s var(--e-std); }
+.changed.up { animation-name: changed-up; }
+.changed.down { animation-name: changed-down; }
+@keyframes changed { from { background-color: var(--brand-soft); box-shadow: 0 0 0 4px var(--brand-soft); } }
+@keyframes changed-up { from { background-color: var(--positive-soft); box-shadow: 0 0 0 4px var(--positive-soft); } }
+@keyframes changed-down { from { background-color: var(--review-soft); box-shadow: 0 0 0 4px var(--review-soft); } }
+.chip { transition: background var(--m-base) var(--e-std), color var(--m-base) var(--e-std), border-color var(--m-base) var(--e-std); }
+.chip.changed, .state.changed { animation: chip-changed var(--m-slow) var(--e-out); }
+@keyframes chip-changed { from { transform: scale(.92); opacity: .4; } }
+
+/* ------------------------------------------------------------------ data motion: charts draw themselves */
+/* Draw animations run on first paint. Elements below the fold get .will-draw from JS, which holds them at
+   their start until they scroll into view. Live updates (html.no-enter) never redraw. */
+.chart .bar { transform-box: fill-box; transform-origin: 50% 100%; animation: grow-y var(--m-slow) var(--e-out) both; }
+.chart g:nth-of-type(2) .bar { animation-delay: 28ms; } .chart g:nth-of-type(3) .bar { animation-delay: 56ms; }
+.chart g:nth-of-type(4) .bar { animation-delay: 84ms; } .chart g:nth-of-type(5) .bar { animation-delay: 112ms; }
+.chart g:nth-of-type(6) .bar { animation-delay: 140ms; } .chart g:nth-of-type(7) .bar { animation-delay: 168ms; }
+.chart g:nth-of-type(8) .bar { animation-delay: 196ms; } .chart g:nth-of-type(9) .bar { animation-delay: 224ms; }
+.chart g:nth-of-type(10) .bar { animation-delay: 252ms; } .chart g:nth-of-type(11) .bar { animation-delay: 280ms; }
+.chart g:nth-of-type(n+12) .bar { animation-delay: 308ms; }
+.chart .line { stroke-dasharray: 1; animation: draw-line 900ms var(--e-inout) both; }
+.chart .area, .chart .dot, .chart .val { animation: fade-in var(--m-slow) var(--e-std) 650ms both; }
+svg.fbar rect { transform-box: fill-box; transform-origin: 50% 50%; animation: grow-x var(--m-slow) var(--e-out) both; }
+.f-row:nth-child(2) svg.fbar rect { animation-delay: 50ms; } .f-row:nth-child(3) svg.fbar rect { animation-delay: 100ms; }
+.f-row:nth-child(4) svg.fbar rect { animation-delay: 150ms; } .f-row:nth-child(5) svg.fbar rect { animation-delay: 200ms; }
+.f-row:nth-child(6) svg.fbar rect { animation-delay: 250ms; } .f-row:nth-child(7) svg.fbar rect { animation-delay: 300ms; }
+.f-row:nth-child(8) svg.fbar rect { animation-delay: 350ms; }
+svg.pbar .fill, svg.hbar .fill, .bars svg .fill, .score svg .fill {
+  transform-box: fill-box; transform-origin: 0 50%; animation: grow-x-start var(--m-slow) var(--e-out) 80ms both; }
+.bars .b:nth-child(2) svg .fill { animation-delay: 120ms; } .bars .b:nth-child(3) svg .fill { animation-delay: 160ms; }
+.bars .b:nth-child(4) svg .fill { animation-delay: 200ms; } .bars .b:nth-child(5) svg .fill { animation-delay: 240ms; }
+@keyframes grow-y { from { transform: scaleY(0); } }
+@keyframes grow-x { from { transform: scaleX(0); } }
+@keyframes grow-x-start { from { transform: scaleX(0); } }
+@keyframes draw-line { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+/* Timelines (the spoor) fill node by node: the story of one finding, from source to result. */
+.spoor > li .node { animation: node-in var(--m-base) var(--e-out) both; }
+.spoor > li::before { transform-origin: 50% 0; animation: grow-y var(--m-slow) var(--e-out) both; }
+.spoor > li:nth-child(2) .node { animation-delay: 160ms; } .spoor > li:nth-child(1)::before { animation-delay: 80ms; }
+.spoor > li:nth-child(3) .node { animation-delay: 320ms; } .spoor > li:nth-child(2)::before { animation-delay: 240ms; }
+.spoor > li:nth-child(4) .node { animation-delay: 480ms; } .spoor > li:nth-child(3)::before { animation-delay: 400ms; }
+.spoor > li:nth-child(5) .node { animation-delay: 640ms; } .spoor > li:nth-child(4)::before { animation-delay: 560ms; }
+.spoor > li:nth-child(n+6) .node { animation-delay: 800ms; } .spoor > li:nth-child(n+5)::before { animation-delay: 720ms; }
+@keyframes node-in { from { transform: scale(.4); opacity: 0; } }
+
+/* Case lifecycle: completed steps fill from left to right. */
+.pipeline li::before { transform-origin: 0 50%; animation: grow-x-start var(--m-slow) var(--e-out) both; }
+.pipeline li::after { animation: node-in var(--m-base) var(--e-out) both; }
+.pipeline li:nth-child(2)::before, .pipeline li:nth-child(2)::after { animation-delay: 90ms; }
+.pipeline li:nth-child(3)::before, .pipeline li:nth-child(3)::after { animation-delay: 180ms; }
+.pipeline li:nth-child(4)::before, .pipeline li:nth-child(4)::after { animation-delay: 270ms; }
+.pipeline li:nth-child(5)::before, .pipeline li:nth-child(5)::after { animation-delay: 360ms; }
+.pipeline li:nth-child(6)::before, .pipeline li:nth-child(6)::after { animation-delay: 450ms; }
+.pipeline li:nth-child(n+7)::before, .pipeline li:nth-child(n+7)::after { animation-delay: 540ms; }
+
+/* Held at the start while below the fold; released by JS on entry. */
+.will-draw, .will-draw *, .will-draw *::before, .will-draw *::after { animation-play-state: paused !important; }
+html.no-enter .chart *, html.no-enter svg.fbar rect, html.no-enter svg.pbar .fill, html.no-enter svg.hbar .fill,
+html.no-enter .bars svg .fill, html.no-enter .score svg .fill, html.no-enter .spoor > li .node,
+html.no-enter .spoor > li::before, html.no-enter .pipeline li::before, html.no-enter .pipeline li::after { animation: none; }
+
+/* ------------------------------------------------------------------ signature: the spoor (data flow line) */
+/* The one visual motif: a quiet line that carries data Contract → Factuur → Meter → Audit → Terugvordering.
+   A node fills when its data has arrived; a segment fills once both of its ends are known. The travelling pulse
+   (.flowing) is shown only while work is actually in progress. */
+.trace { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  position: relative; min-width: 0; }
+.trace li { position: relative; display: grid; justify-items: center; gap: 6px; min-width: 0; font-size: .6875rem;
+  font-weight: 600; color: var(--ink-4); transition: color var(--m-base) var(--e-std); }
+.trace li span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace li i { position: relative; z-index: 1; width: 10px; height: 10px; border-radius: 50%; background: var(--surface);
+  border: 1.5px solid var(--line-2); transition: background var(--m-base) var(--e-std), border-color var(--m-base) var(--e-std),
+  transform var(--m-base) var(--e-out); }
+.trace li + li::before, .trace li + li::after { content: ""; position: absolute; top: 4px; height: 2px;
+  left: calc(-50% + 7px); right: calc(50% + 7px); border-radius: 2px; background: var(--line); }
+.trace li + li::after { background: var(--brand); transform-origin: 0 50%; transform: scaleX(0);
+  transition: transform var(--m-slow) var(--e-out); }
+.trace li.on, .trace li.warn, .trace li.good { color: var(--ink-2); }
+.trace li.on i { background: var(--brand); border-color: var(--brand); }
+.trace li.warn i { background: var(--review-mark); border-color: var(--review-mark); }
+.trace li.good i { background: var(--positive); border-color: var(--positive); }
+.trace li.seg::after { transform: scaleX(1); }
+.trace.flowing::after { content: ""; position: absolute; top: 4px; height: 2px; left: 10%; right: 10%; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0, var(--brand) 50%, transparent 100%) no-repeat; background-size: 16% 100%;
+  animation: strip-flow 2.4s linear infinite; opacity: .7; }
+
+/* AI Operations pipeline: a pulse travels along the strip only while an agent is working. */
+.pipe { position: relative; }
+.pipe.flowing::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0, var(--brand) 50%, transparent 100%) no-repeat;
+  background-size: 18% 100%; animation: strip-flow 2.6s linear infinite; opacity: .8; }
+@keyframes strip-flow { from { background-position: -20% 0; } to { background-position: 120% 0; } }
+.pipe .p-n { transition: color var(--m-base) var(--e-std); }
+
+/* Agent activity: the dot breathes only while the agent is actually working. */
+.ag-activity { display: grid; gap: 6px; min-width: 0; }
+.ag-activity .verb { display: flex; gap: 8px; align-items: center; font-size: .8125rem; font-weight: 600; color: var(--ink); min-width: 0; }
+.ag-activity .verb i { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--ink-4); }
+.ag-activity .verb.running i { background: var(--brand); animation: breathe 1.8s var(--e-inout) infinite; }
+.ag-activity .verb.waiting i { background: var(--review-mark); }
+.ag-activity .verb.failed i { background: var(--critical); }
+.ag-activity .verb.queued i { background: var(--brand-line); }
+.ag-activity .verb.idle i { background: var(--positive); }
+.ag-activity .step { font-size: .75rem; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-activity svg.pbar { height: 4px; }
+@keyframes breathe { 50% { transform: scale(.65); opacity: .55; } }
+
+/* ------------------------------------------------------------------ numbers */
+.countup { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ reduced motion */
+/* Keep state changes (colour, visibility, final positions); drop travel, loops and sequences. */
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+  .main > .page, .figures > *, .ops-strip > *, .pipe > li, .agent-grid > *, .findings > *, .feed > li, .tasklist > li { animation: none !important; }
+  html.js [data-reveal]:not(.is-in) { opacity: 1; transform: none; }
+  .trace.flowing::after, .pipe.flowing::after, .ag-activity .verb.running i, .pulse-dot { animation: none !important; }
+  .btn:active, .seg a:active { transform: none; }
+  @media (hover: hover) { a.panel:hover, .finding:hover, a.agent-card:hover { transform: none; } }
+  .alert.critical, .toast.error { animation: none; }
+}

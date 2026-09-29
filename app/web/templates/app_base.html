@@ -8,12 +8,14 @@
 <meta name="csrf-token" content="{{ csrf }}">
 <title>{% block title %}Portaal{% endblock %} · {{ operator_name }}</title>
 <link rel="preload" href="/static/fonts/instrument-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/static/app.css">
-<script src="/static/app.js" defer></script>
+<script src="/static/boot.js?v=5"></script>
+<link rel="stylesheet" href="/static/app.css?v=5">
+<link rel="stylesheet" href="/static/motion.css?v=5">
+<script src="/static/app.js?v=5" defer></script>
 </head>
 <body>
 {% if user %}
-{% macro navlink(href, label, ico, match=None, count=None, attention=False) %}{% set m = match or href %}<a href="{{ href }}"{% if path == href or (m != '/app' and path.startswith(m)) or path.startswith(NAV_ALIASES.get(href, ('~',))) %} aria-current="page"{% endif %}>{{ icon(ico) }}{{ label }}{% if count %}<span class="count{{ ' attention' if attention }}">{{ count }}</span>{% endif %}</a>{% endmacro %}
+{% macro navlink(href, label, ico, match=None, count=None, attention=False) %}{% set m = match or href %}<a href="{{ href }}"{% if path == href or (m != '/app' and path.startswith(m)) or path.startswith(NAV_ALIASES.get(href, ('~',))) %} aria-current="page"{% endif %}>{{ icon(ico) }}{{ label }}{% if count %}<span class="count{{ ' attention' if attention }}" data-count-key="nav-{{ href }}" data-value="{{ count }}" data-count-global>{{ count }}</span>{% endif %}</a>{% endmacro %}
 <div class="shell">
   <aside class="sidebar" aria-label="Hoofdnavigatie">
     <a class="logo" href="/app">{{ LOGO }}<span>{{ operator_name }}</span></a>

@@ -27,6 +27,37 @@ class AgentCard:
     completed: int = 0
     failed: int = 0
     last_activity: AgentLog | None = None
+    step: str | None = None  # what the running task is doing right now (live, this process only)
+    progress: tuple[int, int] | None = None
+
+    @property
+    def status_word(self) -> str:
+        """The label under the card: what the agent is doing, in one word or two."""
+        if self.state == "running":
+            return ACTIVITY_NL.get(self.agent.id, "Actief")
+        if self.state == "idle" and self.completed:
+            return "Afgerond"
+        return {"queued": "Wachtend", "waiting": "Beoordeling nodig", "failed": "Fout", "idle": "Beschikbaar",
+                "disabled": "Uitgeschakeld", "planned": "Nog niet gebouwd"}.get(self.state, self.state)
+
+
+# Status word per agent while it works: says what kind of work, not just that it is busy.
+ACTIVITY_NL = {
+    "orchestrator": "Coördineert", "lead_researcher": "Zoekt bedrijven", "lead_qualifier": "Beoordeelt leads",
+    "contact_researcher": "Zoekt contacten", "outreach": "Schrijft e-mails", "email": "Verwerkt e-mail",
+    "follow_up": "Plant opvolging", "invoice_intake": "Leest facturen in", "invoice_analysis": "Analyseert",
+    "audit": "Valideert", "recovery": "Berekent", "claims": "Stelt claim op", "customer_success": "Informeert klant",
+    "finance": "Rekent af", "analytics": "Rapporteert", "qa": "Controleert",
+}
+
+
+def live_step(task_id: str) -> str | None:
+    """The latest step of a running task, in words (a tool call reads as 'Gebruikt <tool>')."""
+    entries = live.entries(task_id)
+    for e in reversed(entries):
+        if e.event != "tool.call":
+            return e.message
+    return f"Gebruikt {entries[-1].message}" if entries else None
 
 
 def agent_state(a: AgentRecord, queued: int = 0) -> str:
@@ -59,6 +90,10 @@ def dashboard(db: Session) -> dict:
     cards = [AgentCard(a, agent_state(a, queued_per_agent[a.id]),
                        tasks_by_id.get(a.current_task_id) if a.current_task_id else None, queued_per_agent[a.id],
                        done.get(a.id, 0), fails.get(a.id, 0), last_logs.get(a.id)) for a in agents]
+    for c in cards:
+        if c.current_task and c.state == "running":
+            c.step = live_step(c.current_task.id)
+            c.progress = live.progress(c.current_task.id)
     order = {g: i for i, g in enumerate(GROUP_ORDER)}
     cards.sort(key=lambda c: (order.get(c.agent.group, 9), not c.agent.implemented, CATALOG_ORDER.get(c.agent.id, 99)))
     groups: dict[str, list[AgentCard]] = {}

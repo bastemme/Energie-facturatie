@@ -1,0 +1,293 @@
+/* ==========================================================================
+   Public site: the hero product demo and the scroll story.
+   Rule of this file: the DEFAULT styles are the finished state (what you see
+   without JavaScript, with reduced motion, or after the sequence). Styles under
+   `html.js … :not(.sN)` / `:not(.cN)` hold an element back until its step.
+   Steps are driven by app.js (see docs/motion-design-system.md).
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ hero demo: layout */
+.demo-wrap { position: relative; min-width: 0; }
+.demo { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-3);
+  padding: var(--s5); display: grid; gap: var(--s4); font-size: .8125rem; min-width: 0; }
+.demo-bar { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); min-width: 0; }
+.demo-live { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; color: var(--ink); min-width: 0; }
+.demo-live > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.demo-live i { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--positive); transition: background var(--m-base); }
+.demo-id { color: var(--ink-4); font-size: .75rem; white-space: nowrap; }
+
+.demo-sheet { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: var(--s4) var(--s5); background: var(--surface); }
+.demo-head { display: flex; justify-content: space-between; gap: var(--s4); padding-bottom: var(--s3); border-bottom: 1px solid var(--line); }
+.demo-head > div { display: grid; gap: 2px; justify-items: start; align-content: start; min-width: 0; }
+.demo-head b { font-size: .9375rem; font-weight: 600; }
+.demo-head span { color: var(--ink-3); font-size: .75rem; }
+.demo-lines { list-style: none; margin: var(--s2) 0 0; padding: 0; }
+.demo-lines li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--s4); padding: 7px 8px; border-radius: 6px;
+  font-variant-numeric: tabular-nums; color: var(--ink-2);
+  transition: background var(--m-slow) var(--e-std), box-shadow var(--m-slow) var(--e-std), color var(--m-slow) var(--e-std); }
+.demo-lines li .q { color: var(--ink-3); }
+.demo-lines li b { font-weight: 550; color: var(--ink); min-width: 84px; text-align: right; }
+.demo-lines li.hit { background: var(--review-soft); color: var(--ink); box-shadow: inset 3px 0 0 var(--review-mark); }
+.demo-total { display: flex; justify-content: space-between; padding: var(--s2) 8px 0; margin-top: var(--s1); border-top: 1px solid var(--line);
+  font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Invoice regions that an extracted field points to. */
+[data-region] { border-radius: 4px; transition: background var(--m-fast) var(--e-std), box-shadow var(--m-fast) var(--e-std), color var(--m-fast); }
+[data-region].lit { background: var(--brand-soft); color: var(--brand-strong); box-shadow: 0 0 0 3px var(--brand-soft), 0 0 0 4px var(--brand-line); }
+
+/* The scan: one pass of a thin line down the sheet (transform only; the element is as tall as the sheet). */
+.scan { position: absolute; inset: 0; pointer-events: none; opacity: 0; transform: translateY(-100%);
+  background: linear-gradient(180deg, transparent 78%, rgba(41, 68, 216, .06) 94%, rgba(41, 68, 216, .28) 100%);
+  border-bottom: 1px solid var(--brand); }
+
+/* Extracted fields */
+.demo-fields { display: grid; gap: var(--s2); min-width: 0; }
+.fld-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.fld { font: inherit; font-size: .75rem; font-weight: 550; padding: 3px 10px 3px 8px; border-radius: var(--r-pill); border: 1px solid var(--line-2);
+  background: var(--surface); color: var(--ink-2); cursor: default; display: inline-flex; align-items: center; gap: 6px;
+  transition: background var(--m-fast) var(--e-std), border-color var(--m-fast) var(--e-std), color var(--m-fast) var(--e-std),
+  opacity var(--m-base) var(--e-out), transform var(--m-base) var(--e-out); }
+.fld::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--positive); }
+.fld:hover, .fld.lit, .fld:focus-visible { border-color: var(--brand-line); background: var(--brand-soft); color: var(--brand-strong); }
+.fld-detail { margin: 0; min-height: 1.5em; display: flex; flex-wrap: wrap; gap: 0 8px; font-size: .75rem; color: var(--ink-3);
+  transition: opacity var(--m-base) var(--e-std); }
+.fld-detail [data-d-value] { color: var(--ink-2); }
+.fld-detail span + span:not(:empty)::before { content: "·"; margin-right: 8px; color: var(--ink-4); }
+
+/* Reconciliation rows (shared by the demo and the story) */
+.demo-recon, .st-recon { display: grid; gap: 4px; min-width: 0; }
+.rc { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--s3); align-items: center;
+  padding: 7px 10px; border-radius: 6px; background: var(--canvas); font-size: .75rem; font-variant-numeric: tabular-nums;
+  transition: background var(--m-slow) var(--e-std), box-shadow var(--m-slow) var(--e-std), opacity var(--m-slow) var(--e-out),
+  transform var(--m-slow) var(--e-out); }
+.rc-k { color: var(--ink-3); font-weight: 600; }
+.rc-a, .rc-b { color: var(--ink-2); min-width: 0; }
+.rc-v { justify-self: end; display: inline-flex; gap: 4px; align-items: center; font-weight: 600; white-space: nowrap;
+  transition: opacity var(--m-base) var(--e-std); }
+.rc-v svg { width: 14px; height: 14px; }
+.rc .bad { color: var(--review); }
+.rc .ok { color: var(--positive); display: inline-flex; gap: 4px; align-items: center; }
+.rc.r-rate { background: var(--review-soft); box-shadow: inset 3px 0 0 var(--review-mark); }
+.rc.rc-h { background: none; padding-top: 0; padding-bottom: 0; }
+.rc.rc-h span { font-size: .6875rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-4); }
+
+/* Result */
+.demo-result { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s4); align-items: end;
+  padding-top: var(--s4); border-top: 1px solid var(--line); }
+.amtbox { display: grid; gap: 4px; min-width: 0; transition: opacity var(--m-slow) var(--e-out), transform var(--m-slow) var(--e-out); }
+.amtbox .label { display: flex; gap: 8px; align-items: center; }
+.demo .amt, .st-amount .amt { font-size: 1.875rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.1; color: var(--ink); }
+.amtbox .why { color: var(--ink-3); font-size: .75rem; }
+.proof { display: grid; gap: var(--s2); justify-items: end; }
+.evidence { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; justify-items: end; font-size: .75rem; color: var(--ink-2); }
+.evidence li { display: inline-flex; gap: 6px; align-items: center; transition: opacity var(--m-base) var(--e-out), transform var(--m-base) var(--e-out); }
+.evidence svg { width: 13px; height: 13px; color: var(--ink-4); }
+.demo .case { display: inline-flex; gap: 6px; align-items: center; font-size: .75rem; font-weight: 600; color: var(--positive);
+  padding: 3px 10px 3px 7px; border-radius: var(--r-pill); background: var(--positive-soft); border: 1px solid var(--positive-line);
+  transition: opacity var(--m-base) var(--e-out), transform var(--m-base) var(--e-out); }
+.demo .case svg { width: 14px; height: 14px; }
+.demo-caption { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: var(--s3); font-size: .75rem; color: var(--ink-4); }
+
+/* Signature line in the demo and the story: finished state. */
+.demo .trace li, .story-stage .trace li { color: var(--ink-2); }
+.demo .trace li i, .story-stage .trace li i { background: var(--brand); border-color: var(--brand); }
+.demo .trace [data-node="audit"] i, .story-stage .trace [data-node="audit"] i { background: var(--review-mark); border-color: var(--review-mark); }
+.demo .trace [data-node="recovery"] i, .story-stage .trace [data-node="recovery"] i { background: var(--positive); border-color: var(--positive); }
+.demo .trace li + li::after, .story-stage .trace li + li::after { transform: scaleX(1); }
+
+/* ------------------------------------------------------------------ hero demo: the ten steps */
+/* s1 invoice appears · s2 scanned · s3 data extracted · s4 contract compared · s5 consumption compared ·
+   s6 anomaly detected · s7 line highlighted · s8 recovery amount · s9 evidence · s10 case created */
+html.js .demo:not(.done) .demo-live i { background: var(--brand); animation: breathe 1.8s var(--e-inout) infinite; }
+html.js .demo:not(.done) .trace::after { content: ""; position: absolute; top: 4px; height: 2px; left: 10%; right: 10%; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0, var(--brand) 50%, transparent 100%) no-repeat; background-size: 16% 100%;
+  animation: strip-flow 2.4s linear infinite; opacity: .6; }
+
+.demo-sheet { transition: opacity var(--m-story) var(--e-out), transform var(--m-story) var(--e-out); }
+html.js .demo:not(.s1) .demo-sheet { opacity: 0; transform: translateY(10px) scale(.99); }
+html.js .demo.s2:not(.done) .scan { animation: demo-scan 1.4s var(--e-inout) both; }
+@keyframes demo-scan { 0% { opacity: 0; transform: translateY(-100%); } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; transform: translateY(0); } }
+
+html.js .demo:not(.s3) .fld { opacity: 0; transform: translateY(4px); }
+html.js .demo:not(.s3) .fld-detail { opacity: 0; }
+html.js .demo.s3:not(.done) .fld:nth-child(2) { transition-delay: 45ms; } html.js .demo.s3:not(.done) .fld:nth-child(3) { transition-delay: 90ms; }
+html.js .demo.s3:not(.done) .fld:nth-child(4) { transition-delay: 135ms; } html.js .demo.s3:not(.done) .fld:nth-child(5) { transition-delay: 180ms; }
+html.js .demo.s3:not(.done) .fld:nth-child(6) { transition-delay: 225ms; }
+/* Each extracted value briefly marks where it was read. */
+html.js .demo.s3:not(.s4) [data-region] { animation: region-read 800ms var(--e-std) both; }
+@keyframes region-read { 0%, 30% { background: var(--brand-soft); box-shadow: 0 0 0 3px var(--brand-soft); } }
+
+html.js .demo:not(.s4) .demo-recon .r-rate, html.js .demo:not(.s5) .demo-recon .r-use { opacity: 0; transform: translateY(4px); }
+html.js .demo:not(.s6) .demo-recon .r-rate { background: var(--canvas); box-shadow: none; }
+html.js .demo:not(.s6) .demo-recon .r-rate .rc-v { opacity: 0; }
+
+html.js .demo:not(.s7) .demo-lines li.hit { background: transparent; box-shadow: none; color: var(--ink-2); }
+
+html.js .demo:not(.s8) .amtbox { opacity: 0; transform: translateY(6px); }
+html.js .demo:not(.s9) .evidence li { opacity: 0; transform: translateX(6px); }
+html.js .demo.s9:not(.done) .evidence li:nth-child(2) { transition-delay: 90ms; }
+html.js .demo.s9:not(.done) .evidence li:nth-child(3) { transition-delay: 180ms; }
+html.js .demo:not(.s10) .case { opacity: 0; transform: scale(.96); }
+.demo.s10 .case svg path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw-check var(--m-slow) var(--e-out) 160ms forwards; }
+
+/* The signature line fills as the data arrives: invoice first, then contract, meter, audit, recovery. */
+html.js .demo:not(.s1) [data-node="invoice"] i, html.js .demo:not(.s4) [data-node="contract"] i,
+html.js .demo:not(.s5) [data-node="meter"] i, html.js .demo:not(.s6) [data-node="audit"] i,
+html.js .demo:not(.s8) [data-node="recovery"] i { background: var(--surface); border-color: var(--line-2); }
+html.js .demo:not(.s1) [data-node="invoice"], html.js .demo:not(.s4) [data-node="contract"], html.js .demo:not(.s5) [data-node="meter"],
+html.js .demo:not(.s6) [data-node="audit"], html.js .demo:not(.s8) [data-node="recovery"] { color: var(--ink-4); }
+html.js .demo:not(.s10) [data-node="recovery"] i { background: var(--brand); border-color: var(--brand); }
+html.js .demo:not(.s8) [data-node="recovery"] i { background: var(--surface); border-color: var(--line-2); }
+html.js .demo:not(.s4) [data-node="invoice"]::after, html.js .demo:not(.s5) [data-node="meter"]::after,
+html.js .demo:not(.s6) [data-node="audit"]::after, html.js .demo:not(.s8) [data-node="recovery"]::after { transform: scaleX(0); }
+
+/* ------------------------------------------------------------------ scroll story: layout */
+.story-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: var(--s16); align-items: start; }
+.chapters { list-style: none; margin: 0; padding: 0; }
+.chapters li { min-height: 62vh; display: flex; flex-direction: column; justify-content: center; gap: var(--s2); max-width: 430px;
+  transition: opacity var(--m-slow) var(--e-std); }
+.chapters li:first-child { min-height: 48vh; justify-content: flex-start; padding-top: var(--s10); }
+.chapters .k { font-size: var(--fs-label); font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--brand); }
+.chapters h3 { font-size: 1.375rem; letter-spacing: -.02em; line-height: 1.2; }
+.chapters p { color: var(--ink-2); font-size: 1rem; }
+html.js .chapters li:not(.current) { opacity: .32; }
+
+.story-stage { position: sticky; top: max(88px, calc(50vh - 290px)); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: var(--shadow-3); padding: var(--s6); display: grid; gap: var(--s5); min-width: 0; font-size: .8125rem; }
+.st-top { display: flex; align-items: center; gap: var(--s4); min-width: 0; }
+.st-top .trace { flex: 1; }
+
+.st-docs { position: relative; height: 150px; }
+.st-doc { position: absolute; top: 0; bottom: 0; width: calc((100% - 2 * var(--s3)) / 3); display: grid; align-content: start; gap: 2px;
+  padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-1);
+  overflow: hidden; transition: opacity var(--m-story) var(--e-out), transform var(--m-story) var(--e-out); }
+.d-contract { left: 0; }
+.d-invoice { left: calc((100% - 2 * var(--s3)) / 3 + var(--s3)); }
+.d-meter { right: 0; }
+.st-doc b { font-size: .875rem; font-weight: 600; }
+.st-doc dl { margin: var(--s2) 0 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 8px; }
+.st-doc dt { color: var(--ink-3); }
+.st-doc dd { margin: 0; text-align: right; color: var(--ink-2); white-space: nowrap; }
+.st-doc b { overflow-wrap: anywhere; }
+.st-doc mark { background: transparent; color: inherit; border-radius: 3px; padding: 0 3px; margin: 0 -3px;
+  transition: background var(--m-slow) var(--e-std), color var(--m-slow) var(--e-std); }
+.st-doc mark.m-rate { background: var(--review-soft); color: var(--review); }
+.st-doc mark.m-use { background: var(--positive-soft); color: var(--positive); }
+.st-claim { position: absolute; inset: 0; display: grid; align-content: start; gap: 4px; padding: var(--s4); border: 1px solid var(--positive-line);
+  border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-2);
+  transition: opacity var(--m-story) var(--e-out), transform var(--m-story) var(--e-out); }
+.st-claim b { font-size: .875rem; }
+.st-claim ul { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: 4px; color: var(--ink-2); }
+.st-claim li { display: flex; gap: 8px; align-items: center; }
+.st-claim svg { width: 14px; height: 14px; color: var(--positive); }
+/* Finished: the claim sits on top of the documents it was built from. */
+.st-doc { opacity: 0; transform: scale(.96); }
+
+.st-amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--s3); padding-top: var(--s4); border-top: 1px solid var(--line);
+  transition: opacity var(--m-slow) var(--e-out), transform var(--m-slow) var(--e-out); }
+.st-amount .label { flex-basis: 100%; }
+.st-amount .st-calc { color: var(--ink-3); }
+
+/* Recovery journey: € 0 → Mogelijk → Gedetecteerd → Beoordeeld → Geclaimd → Teruggevorderd */
+.journey { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); position: relative; }
+.journey::before, .journey::after { content: ""; position: absolute; top: 4px; height: 2px; left: calc(100% / 12); right: calc(100% / 12);
+  border-radius: 2px; background: var(--line); }
+.journey::after { background: var(--positive); transform-origin: 0 50%; transition: transform var(--m-story) var(--e-out); }
+.journey li { position: relative; z-index: 1; display: grid; justify-items: center; gap: 6px; min-width: 0; font-size: .6875rem;
+  font-weight: 600; color: var(--ink-2); text-align: center; transition: color var(--m-base) var(--e-std); }
+.journey li span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.journey li i { width: 10px; height: 10px; border-radius: 50%; background: var(--positive); border: 1.5px solid var(--positive);
+  transition: background var(--m-base) var(--e-std), border-color var(--m-base) var(--e-std); }
+
+/* ------------------------------------------------------------------ scroll story: chapters c1..c7 */
+/* The interface transforms: the contract arrives centre stage, moves aside for the invoice, the meter data joins,
+   the three are reconciled into rows, one row turns into the finding, the finding into an amount, the amount
+   into a claim. */
+html.js .story-stage:not(.c7) .st-doc { opacity: 1; transform: none; }
+html.js .story-stage.c4:not(.c7) .st-doc { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+html.js .story-stage:not(.c1) .d-contract { opacity: 0; transform: translateY(12px); }
+html.js .story-stage.c1:not(.c2) .d-contract { transform: translateX(calc(100% + var(--s3))); }
+html.js .story-stage:not(.c2) .d-invoice { opacity: 0; transform: translateX(24px); }
+html.js .story-stage:not(.c3) .d-meter { opacity: 0; transform: translateX(24px); }
+html.js .story-stage:not(.c7) .st-claim { opacity: 0; transform: translateY(16px); pointer-events: none; }
+
+html.js .story-stage:not(.c4) .st-doc mark { background: transparent; color: inherit; }
+html.js .story-stage.c4:not(.c5) .st-doc mark { background: var(--brand-soft); color: var(--brand-strong); }
+
+html.js .story-stage:not(.c4) .st-recon .rc { opacity: 0; transform: translateY(-8px); }
+html.js .story-stage.c4:not(.c5) .st-recon .rc:nth-child(2) { transition-delay: 60ms; }
+html.js .story-stage.c4:not(.c5) .st-recon .rc:nth-child(3) { transition-delay: 120ms; }
+html.js .story-stage.c4:not(.c5) .st-recon .rc:nth-child(4) { transition-delay: 180ms; }
+html.js .story-stage:not(.c5) .st-recon .r-rate { background: var(--canvas); box-shadow: none; }
+html.js .story-stage:not(.c5) .st-recon .r-rate .rc-v { opacity: 0; }
+html.js .story-stage.c5 .st-recon .r-use, html.js .story-stage.c5 .st-recon .r-per { opacity: .6; }
+
+html.js .story-stage:not(.c6) .st-amount { opacity: 0; transform: translateY(8px); }
+
+html.js .story-stage:not(.c1) [data-node="contract"] i, html.js .story-stage:not(.c2) [data-node="invoice"] i,
+html.js .story-stage:not(.c3) [data-node="meter"] i { background: var(--surface); border-color: var(--line-2); }
+html.js .story-stage:not(.c5) [data-node="audit"] i { background: var(--brand); border-color: var(--brand); }
+html.js .story-stage:not(.c4) [data-node="audit"] i { background: var(--surface); border-color: var(--line-2); }
+html.js .story-stage:not(.c7) [data-node="recovery"] i { background: var(--brand); border-color: var(--brand); }
+html.js .story-stage:not(.c6) [data-node="recovery"] i { background: var(--surface); border-color: var(--line-2); }
+html.js .story-stage:not(.c1) [data-node="contract"], html.js .story-stage:not(.c2) [data-node="invoice"],
+html.js .story-stage:not(.c3) [data-node="meter"], html.js .story-stage:not(.c4) [data-node="audit"],
+html.js .story-stage:not(.c6) [data-node="recovery"] { color: var(--ink-4); }
+html.js .story-stage:not(.c2) [data-node="invoice"]::after, html.js .story-stage:not(.c3) [data-node="meter"]::after,
+html.js .story-stage:not(.c4) [data-node="audit"]::after, html.js .story-stage:not(.c6) [data-node="recovery"]::after { transform: scaleX(0); }
+
+/* Journey: where the money is. */
+html.js .story-stage:not(.c4) .journey::after { transform: scaleX(0); }
+html.js .story-stage.c4:not(.c5) .journey::after { transform: scaleX(.2); }
+html.js .story-stage.c5:not(.c6) .journey::after { transform: scaleX(.4); }
+html.js .story-stage.c6:not(.c7) .journey::after { transform: scaleX(.6); }
+.story-stage.c7 .journey::after { transition-duration: 1.4s; }
+html.js .story-stage:not(.c4) .journey li:nth-child(2) i, html.js .story-stage:not(.c5) .journey li:nth-child(3) i,
+html.js .story-stage:not(.c6) .journey li:nth-child(4) i, html.js .story-stage:not(.c7) .journey li:nth-child(n+5) i {
+  background: var(--surface); border-color: var(--line-2); }
+html.js .story-stage:not(.c4) .journey li:nth-child(2), html.js .story-stage:not(.c5) .journey li:nth-child(3),
+html.js .story-stage:not(.c6) .journey li:nth-child(4), html.js .story-stage:not(.c7) .journey li:nth-child(n+5) { color: var(--ink-4); }
+.story-stage.c7 .journey li:nth-child(5) i { transition-delay: 500ms; }
+.story-stage.c7 .journey li:nth-child(6) i { transition-delay: 1100ms; }
+
+/* ------------------------------------------------------------------ responsive */
+@media (max-width: 1100px) {
+  .demo-wrap { max-width: 600px; }
+}
+@media (max-width: 900px) {
+  /* Small screens: no sticky stage. The finished picture comes first, the chapters read as plain text. */
+  .story-grid { grid-template-columns: minmax(0, 1fr); gap: var(--s8); }
+  .story-stage { position: static; order: -1; padding: var(--s4); }
+  .chapters { display: grid; gap: var(--s6); }
+  .chapters li, .chapters li:first-child { min-height: 0; padding-top: 0; max-width: none; }
+  html.js .chapters li:not(.current) { opacity: 1; }
+  .st-docs { height: auto; display: grid; gap: var(--s2); }
+  .st-doc, .st-claim { position: static; width: auto; opacity: 1; transform: none; }
+  .st-doc dl { margin-top: 2px; }
+  .st-claim { order: 4; }
+}
+@media (max-width: 640px) {
+  .demo-head { flex-wrap: wrap; gap: var(--s2); }
+  .demo { padding: var(--s4); gap: var(--s3); }
+  .demo-sheet { padding: var(--s3) var(--s4); }
+  .demo-lines li { grid-template-columns: minmax(0, 1fr) auto; row-gap: 0; }
+  .demo-lines li .q { grid-column: 1; grid-row: 2; font-size: .75rem; }
+  .demo-lines li b { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+  .rc { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "k v" "a b"; row-gap: 2px; }
+  .rc-k { grid-area: k; } .rc-v { grid-area: v; } .rc-a { grid-area: a; } .rc-b { grid-area: b; }
+  .rc.rc-h { display: none; }
+  .demo-result { grid-template-columns: minmax(0, 1fr); }
+  .proof, .evidence { justify-items: start; }
+  .trace li { font-size: .625rem; }
+  .journey li { font-size: .5625rem; }
+  .st-top { flex-wrap: wrap; }
+}
+
+/* ------------------------------------------------------------------ reduced motion */
+/* app.js jumps straight to the finished state; here nothing travels or loops. Hover links still respond. */
+@media (prefers-reduced-motion: reduce) {
+  .demo *, .demo *::before, .demo *::after, .story-stage *, .story-stage *::before, .story-stage *::after {
+    animation: none !important; transition-duration: 1ms !important; transition-delay: 0s !important; }
+  html.js .chapters li:not(.current) { opacity: 1; }
+}

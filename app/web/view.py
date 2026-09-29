@@ -303,7 +303,7 @@ def line_chart(points: list[MonthPoint]) -> Markup:
     line = " ".join(f"{x:.1f},{y:.1f}" for x, y in xy)
     area = (f"M{xy[0][0]:.1f},{T + ph} L" + " L".join(f"{x:.1f},{y:.1f}" for x, y in xy)
             + f" L{xy[-1][0]:.1f},{T + ph} Z")
-    out.append(f'<path class="area" d="{area}"/><polyline class="line" points="{line}"/>')
+    out.append(f'<path class="area" d="{area}"/><polyline class="line" pathLength="1" points="{line}"/>')
     for (x, y), p in zip(xy, pts, strict=True):
         flag = p.flagged > 0
         tip = f"{p.label}: {format_decimal_nl(p.kwh.quantize(Decimal(1)))} kWh" + (" · bevinding" if flag else "")

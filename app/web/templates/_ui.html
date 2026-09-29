@@ -1,5 +1,8 @@
 {# Factuurspoor UI components. Import with: {% import "_ui.html" as ui with context %} #}
 
+{# A figure that animates from its previous value when it changed since the last view (see app.js). #}
+{% macro num(value, key, fmt='int', scope='page') %}<span class="countup" data-count-key="{{ key }}" data-value="{{ value }}" data-format="{{ fmt }}"{% if scope == 'global' %} data-count-global{% endif %}>{{ value|eur if fmt == 'eur' else value }}</span>{% endmacro %}
+
 {% macro csrf_field() %}<input type="hidden" name="csrf_token" value="{{ csrf }}">{% endmacro %}
 
 {% macro chip(text, cls="neutral", tip=None) %}<span class="chip {{ cls }}"{% if tip %} data-tip="{{ tip }}" tabindex="0"{% endif %}>{{ text }}</span>{% endmacro %}
@@ -43,17 +46,17 @@
   </div>
   <div class="figure">
     <span class="label"><i class="key review"></i>Mogelijke discrepanties</span>
-    <span class="value">{{ s.potential_discrepancies|eur }}</span>
+    <span class="value">{{ num(s.potential_discrepancies, 'potential', 'eur') }}</span>
     <span class="sub">Nog te verifiëren, geen vaststaande vordering</span>
   </div>
   <div class="figure">
     <span class="label"><i class="key brand"></i>Bevestigd</span>
-    <span class="value">{{ s.confirmed_discrepancies|eur }}</span>
+    <span class="value">{{ num(s.confirmed_discrepancies, 'confirmed', 'eur') }}</span>
     <span class="sub">Na beoordeling door een specialist</span>
   </div>
   <div class="figure recovered">
     <span class="label"><i class="key positive"></i>Teruggevorderd</span>
-    <span class="value">{{ s.recovered|eur }}</span>
+    <span class="value">{{ num(s.recovered, 'recovered', 'eur') }}</span>
     <span class="sub">Daadwerkelijk gecrediteerd of betaald</span>
   </div>
   <div class="minis">

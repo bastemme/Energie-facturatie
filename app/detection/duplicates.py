@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import UTC
 
 from app.detection.base import (
     STRUCTURED_METHODS,
@@ -31,7 +32,10 @@ def _supplier_key(inv: Invoice) -> str:
 
 def _preference(inv: Invoice) -> tuple:
     structured = bool(inv.lines) and all(li.extraction_method in STRUCTURED_METHODS for li in inv.lines)
-    return (inv.is_verified, structured, inv.extraction_confidence or 0, inv.created_at or 0)
+    # SQLite returns naive datetimes while freshly created rows still hold aware ones: compare as UTC timestamps.
+    created = inv.created_at
+    ts = (created if created.tzinfo else created.replace(tzinfo=UTC)).timestamp() if created else 0
+    return (inv.is_verified, structured, inv.extraction_confidence or 0, ts)
 
 
 def mark_data_duplicates(ctx: AnalysisContext) -> list[tuple[Invoice, list[Invoice]]]:

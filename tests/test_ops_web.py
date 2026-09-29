@@ -77,3 +77,34 @@ def test_only_admins_toggle_agents(app_client):  # noqa: F811
     r = app_client.post("/app/ops/agents/lead_researcher/toggle",
                         data={"csrf_token": csrf(app_client, "/app/ops")}, follow_redirects=False)
     assert r.status_code == 403
+
+
+def test_running_agent_card_shows_live_step_and_progress(app_client):  # noqa: F811
+    from datetime import UTC, datetime
+
+    from app.agents import live
+    from app.domain.enums import AgentStatus
+    from app.models import AgentRecord
+
+    make_user("ops@fs.nl", Role.REVIEWER)
+    login(app_client, "ops@fs.nl")
+    app_client.get("/app/ops")  # registers the agents
+    with session() as s:
+        task = AgentTask(agent_id="invoice_analysis", task_type="analyze", title="Factuur 00482 analyseren",
+                         status=TaskStatus.RUNNING,
+                         input={})
+        s.add(task)
+        s.flush()
+        agent = s.get(AgentRecord, "invoice_analysis")
+        agent.status, agent.current_task_id = AgentStatus.RUNNING, task.id
+        s.commit()
+        task_id = task.id
+    live.append(task_id, live.LiveEntry(datetime.now(UTC), "step", "Controleregels uitvoeren", "INFO",
+                                        None, None))
+    live.set_progress(task_id, 3, 16)
+    try:
+        page = app_client.get("/app/ops").text
+    finally:
+        live.clear(task_id)
+    assert "Factuur 00482 analyseren" in page and "Controleregels uitvoeren · 3 / 16" in page
+    assert 'data-state-key="agent-invoice_analysis">Analyseert<' in page

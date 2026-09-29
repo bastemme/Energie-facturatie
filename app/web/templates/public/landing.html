@@ -18,26 +18,81 @@
       </div>
     </div>
 
-    <div class="demo final" aria-label="Voorbeeldanalyse van een energiefactuur">
-      <div class="demo-sheet">
-        <div class="scan" aria-hidden="true"></div>
-        <div class="demo-head">
-          <div><b>Factuur 2026-00124</b><span>Leverperiode 01-08-2026 t/m 31-08-2026</span></div>
-          <div class="r"><span class="tag">EAN 871687…0421</span></div>
+    {% macro trace(label) %}<ol class="trace" aria-label="{{ label }}">
+      <li data-node="contract"><i></i><span>Contract</span></li>
+      <li data-node="invoice"><i></i><span>Factuur</span></li>
+      <li data-node="meter"><i></i><span>Meter</span></li>
+      <li data-node="audit"><i></i><span>Audit</span></li>
+      <li data-node="recovery"><i></i><span>Terugvordering</span></li>
+    </ol>{% endmacro %}
+    <div class="demo-wrap">
+      <div class="demo" data-demo aria-label="Voorbeeldanalyse van een energiefactuur met fictieve gegevens">
+        <div class="demo-bar">
+          <span class="demo-live"><i></i><span data-demo-status aria-live="polite">Dossier aangemaakt</span></span>
+          <span class="demo-id num">Factuur 00482</span>
         </div>
-        <ul class="demo-lines">
-          <li class="hit"><span>Levering normaaltarief</span><span class="q">96.840 kWh × € 0,2350</span><b>€ 22.757,40</b></li>
-          <li><span>Levering daltarief</span><span class="q">71.210 kWh × € 0,1640</span><b>€ 11.678,44</b></li>
-          <li><span>Vaste leveringskosten</span><span class="q">1 maand</span><b>€ 12,50</b></li>
-          <li><span>Capaciteitstarief netbeheer</span><span class="q">1 maand</span><b>€ 1.184,21</b></li>
-        </ul>
-        <div class="demo-total"><span>Subtotaal excl. btw</span><span>€ 35.632,55</span></div>
-      </div>
-      <div class="demo-result" role="status">
-        <span class="label"><i class="key review"></i>Mogelijke terugvordering</span>
-        <span class="amt" data-demo-amount="4842">€ 4.842,00</span>
-        <span class="why">Tarief € 0,2350 per kWh, contractueel € 0,1850. Verschil € 0,0500 × 96.840 kWh.</span>
-        <span class="claim">{{ icon('check-circle') }}Claim voorbereid</span>
+        {{ trace('Dataspoor van de controle') }}
+        <div class="demo-sheet">
+          <div class="scan" aria-hidden="true"></div>
+          <div class="demo-head">
+            <div><b data-region="nr">Factuur 2026-00482</b><span data-region="period">Leverperiode 01-08-2026 t/m 31-08-2026</span></div>
+            <div class="r"><span class="tag" data-region="ean">EAN 871687…0421</span></div>
+          </div>
+          <ul class="demo-lines">
+            <li class="hit"><span>Levering elektriciteit</span><span class="q"><span data-region="usage">127.605 kWh</span> × <span data-region="rate">€ 0,1248</span></span><b>€ 15.925,10</b></li>
+            <li><span>Vaste leveringskosten</span><span class="q">1 maand</span><b>€ 12,50</b></li>
+            <li><span>Capaciteitstarief netbeheer</span><span class="q">1 maand</span><b>€ 1.184,21</b></li>
+            <li><span>Transportafhankelijke kosten</span><span class="q">127.605 kWh</span><b>€ 1.370,50</b></li>
+          </ul>
+          <div class="demo-total"><span>Subtotaal excl. btw</span><span data-region="total">€ 18.492,31</span></div>
+        </div>
+
+        <div class="demo-fields">
+          <span class="label">Uitgelezen velden</span>
+          <div class="fld-list">
+            <button type="button" class="fld" data-field="nr" data-value="Factuurnummer 2026-00482" data-conf="Zekerheid hoog" data-loc="Pagina 1, kop">Factuurnr.</button>
+            <button type="button" class="fld" data-field="period" data-value="01-08-2026 t/m 31-08-2026" data-conf="Zekerheid hoog" data-loc="Pagina 1, kop">Periode</button>
+            <button type="button" class="fld" data-field="ean" data-value="EAN 871687…0421" data-conf="Zekerheid hoog" data-loc="Pagina 1, rechtsboven">EAN</button>
+            <button type="button" class="fld" data-field="usage" data-value="127.605 kWh" data-conf="Zekerheid hoog" data-loc="Pagina 1, regel 1">Verbruik</button>
+            <button type="button" class="fld" data-field="rate" data-value="€ 0,1248 per kWh" data-conf="Zekerheid hoog" data-loc="Pagina 1, regel 1">Tarief</button>
+            <button type="button" class="fld" data-field="total" data-value="€ 18.492,31 excl. btw" data-conf="Zekerheid hoog" data-loc="Pagina 1, subtotaal">Totaal</button>
+          </div>
+          <p class="fld-detail" data-field-detail><span data-d-value>Wijs een veld aan om te zien waar het op de factuur staat.</span><span data-d-conf></span><span data-d-loc></span></p>
+        </div>
+
+        <div class="demo-recon">
+          <div class="rc r-rate"><span class="rc-k">Tarief per kWh</span><span class="rc-a num">Factuur € 0,1248</span><span class="rc-b num">Contract € 0,1182</span><span class="rc-v bad num">+ € 0,0066</span></div>
+          <div class="rc r-use"><span class="rc-k">Verbruik</span><span class="rc-a num">Factuur 127.605 kWh</span><span class="rc-b num">Meter 127.605 kWh</span><span class="rc-v ok">{{ icon('check') }}Klopt</span></div>
+        </div>
+
+        <div class="demo-result">
+          <div class="amtbox">
+            <span class="label"><i class="key review"></i>Mogelijke terugvordering</span>
+            <span class="amt num" data-demo-amount="842.19">€ 842,19</span>
+            <span class="why num">127.605 kWh × € 0,0066 · zekerheid hoog</span>
+          </div>
+          <div class="proof">
+            <ul class="evidence">
+              <li>{{ icon('invoice') }}Factuur p. 1, regel 1</li>
+              <li>{{ icon('contract') }}Contract art. 4.2</li>
+              <li>{{ icon('meter') }}Meterdata aug. 2026</li>
+            </ul>
+            <span class="case">{{ icon('check-circle') }}Dossier aangemaakt</span>
+          </div>
+        </div>
+        <ol hidden>
+          <li data-step-label="0">Factuur 00482 wacht</li>
+          <li data-step-label="1">Factuur 00482 ontvangen</li>
+          <li data-step-label="2">Factuur 00482 wordt gescand</li>
+          <li data-step-label="3">Gegevens uitgelezen</li>
+          <li data-step-label="4">Vergeleken met contract</li>
+          <li data-step-label="5">Vergeleken met meterdata</li>
+          <li data-step-label="6">Afwijking gevonden</li>
+          <li data-step-label="7">Factuurregel gemarkeerd</li>
+          <li data-step-label="8">Terugvordering berekend</li>
+          <li data-step-label="9">Bewijs vastgelegd</li>
+          <li data-step-label="10">Dossier aangemaakt</li>
+        </ol>
       </div>
       <p class="demo-caption">Voorbeeldanalyse met fictieve gegevens · <button class="btn btn-ghost btn-sm" type="button" data-demo-replay>{{ icon('play') }}Opnieuw afspelen</button></p>
     </div>
@@ -46,17 +101,62 @@
 
 <section class="band tint" id="werkwijze">
   <div class="wrap">
-    <div class="band-head">
+    <div class="band-head" data-reveal>
       <span class="label">Werkwijze</span>
       <h2>Van factuurregel tot terugbetaling, elke stap controleerbaar.</h2>
       <p>Zakelijke energiefacturen combineren leveringstarieven, netbeheer, vaste vergoedingen, belastingen en tussentijdse correcties, per aansluiting en per periode. Wij leggen ze systematisch naast uw contract, uw meterstanden en elkaar.</p>
     </div>
-    <ol class="flow">
+    <ol class="flow" data-reveal>
       <li><span class="k">01 · Factuur</span><h3>U levert aan</h3><p>PDF-facturen of een export uit het klantportaal van uw leverancier, plus uw contract en meterstanden als u die heeft.</p></li>
       <li><span class="k">02 · Analyse</span><h3>Wij rekenen na</h3><p>Elke regel wordt gecontroleerd met vaste rekenregels: tarieven, periodes, verbruik, vaste kosten, correcties en belastingen.</p></li>
       <li><span class="k">03 · Afwijking</span><h3>Een specialist toetst</h3><p>Iedere mogelijke afwijking wordt beoordeeld aan de hand van de brondocumenten. Alleen onderbouwde punten gaan door.</p></li>
       <li><span class="k">04 · Terugvordering</span><h3>Wij vorderen terug</h3><p>Na uw akkoord dienen wij een onderbouwd correctieverzoek in bij de leverancier en volgen dit op tot het geld terug is.</p></li>
     </ol>
+  </div>
+</section>
+
+<section class="band story" id="spoor" data-story>
+  <div class="wrap">
+    <div class="band-head" data-reveal>
+      <span class="label">Van contract tot claim</span>
+      <h2>Hoe één afwijking een onderbouwde claim wordt.</h2>
+      <p>Elke terugvordering volgt hetzelfde spoor: contract, factuur en meterdata worden op elkaar gelegd. Alleen wat met de bron is aan te tonen, gaat door.</p>
+    </div>
+    <div class="story-grid">
+      <ol class="chapters">
+        <li data-chapter="1"><span class="k">01 · Contract</span><h3>Het begint bij de afspraak.</h3><p>Wij lezen uw leveringscontract: tarief per kWh, looptijd, indexatie en vaste vergoedingen. Dat is de maatstaf voor elke factuur.</p></li>
+        <li data-chapter="2"><span class="k">02 · Factuur</span><h3>Elke regel wordt uitgelezen.</h3><p>Periode, aansluiting, verbruik, tarief en bedrag, telkens met de plek in het document waar het staat.</p></li>
+        <li data-chapter="3"><span class="k">03 · Meterdata</span><h3>Wat is er werkelijk verbruikt?</h3><p>Het gefactureerde verbruik leggen we naast de meterstanden of de meetdata van de netbeheerder.</p></li>
+        <li data-chapter="4"><span class="k">04 · Reconciliatie</span><h3>Alles wordt op elkaar gelegd.</h3><p>Contract, factuur en meterdata regel voor regel naast elkaar. Wat klopt, vinkt af. Wat niet klopt, blijft staan.</p></li>
+        <li data-chapter="5"><span class="k">05 · Afwijking</span><h3>Eén regel klopt niet.</h3><p>Het verbruik klopt, maar het tarief op de factuur is € 0,1248 per kWh terwijl het contract € 0,1182 zegt. Een specialist toetst dit aan de bron.</p></li>
+        <li data-chapter="6"><span class="k">06 · Terugvordering</span><h3>Een rekensom, geen schatting.</h3><p>127.605 kWh × € 0,0066 = € 842,19. Het bedrag is exact te herleiden tot de factuurregel en het contractartikel.</p></li>
+        <li data-chapter="7"><span class="k">07 · Claim</span><h3>Onderbouwd ingediend, na uw akkoord.</h3><p>Het correctieverzoek gaat naar de leverancier met factuur, contract en meterdata als bijlage. U betaalt alleen als het geld terugkomt.</p></li>
+      </ol>
+      <div class="story-stage" data-story-stage aria-label="Illustratie met fictieve gegevens">
+        <div class="st-top">{{ trace('Dataspoor') }}{{ ui.chip('Fictief voorbeeld', 'quiet') }}</div>
+        <div class="st-docs">
+          <div class="st-doc d-contract"><span class="label">Contract</span><b>Leveringscontract</b>
+            <dl><dt>Tarief</dt><dd class="num"><mark class="m-rate">€ 0,1182 /kWh</mark></dd><dt>Bron</dt><dd>Art. 4.2</dd></dl></div>
+          <div class="st-doc d-invoice"><span class="label">Factuur</span><b class="num">2026-00482</b>
+            <dl><dt>Tarief</dt><dd class="num"><mark class="m-rate">€ 0,1248 /kWh</mark></dd><dt>Verbruik</dt><dd class="num"><mark class="m-use">127.605 kWh</mark></dd></dl></div>
+          <div class="st-doc d-meter"><span class="label">Meterdata</span><b>Augustus 2026</b>
+            <dl><dt>Verbruik</dt><dd class="num"><mark class="m-use">127.605 kWh</mark></dd><dt>Bron</dt><dd>Netbeheerder</dd></dl></div>
+          <div class="st-claim"><span class="label">Correctieverzoek</span><b>Aan de leverancier, na akkoord van de klant</b>
+            <ul><li>{{ icon('invoice') }}Factuur 2026-00482, p. 1, regel 1</li><li>{{ icon('contract') }}Contract, art. 4.2</li><li>{{ icon('meter') }}Meterdata augustus 2026</li></ul></div>
+        </div>
+        <div class="st-recon">
+          <div class="rc rc-h"><span class="rc-k">Controle</span><span class="rc-a">Factuur</span><span class="rc-b">Contract / meter</span><span class="rc-v">Uitkomst</span></div>
+          <div class="rc r-rate"><span class="rc-k">Tarief</span><span class="rc-a num">€ 0,1248</span><span class="rc-b num">€ 0,1182</span><span class="rc-v"><span class="bad num">+ € 0,0066</span></span></div>
+          <div class="rc r-use"><span class="rc-k">Verbruik</span><span class="rc-a num">127.605</span><span class="rc-b num">127.605</span><span class="rc-v"><span class="ok">{{ icon('check') }}Klopt</span></span></div>
+          <div class="rc r-per"><span class="rc-k">Periode</span><span class="rc-a num">aug. 2026</span><span class="rc-b num">aug. 2026</span><span class="rc-v"><span class="ok">{{ icon('check') }}Klopt</span></span></div>
+        </div>
+        <div class="st-amount"><span class="label">Terug te vorderen</span><span class="amt num" data-story-amount="842.19">€ 842,19</span><span class="st-calc num">127.605 kWh × € 0,0066</span></div>
+        <ol class="journey" aria-label="Status van het geld">
+          <li><i></i><span>€ 0</span></li><li><i></i><span>Mogelijk</span></li><li><i></i><span>Gedetecteerd</span></li>
+          <li><i></i><span>Beoordeeld</span></li><li><i></i><span>Geclaimd</span></li><li><i></i><span>Teruggevorderd</span></li>
+        </ol>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -67,7 +167,7 @@
       <h2>Zestien controles op elke factuur.</h2>
       <p>Van eenvoudige rekenfouten tot periodes die door twee leveranciers tegelijk zijn gefactureerd na een overstap.</p>
     </div>
-    <div class="checks">
+    <div class="checks" data-reveal>
       <div><span class="ico">{{ icon('rate') }}</span><h3>Tarieven en contract</h3><p>Toegepaste prijs per kWh of m³ tegenover uw contract, inclusief prijswijzigingen en indexaties per periode.</p></div>
       <div><span class="ico">{{ icon('meter') }}</span><h3>Verbruik en meterstanden</h3><p>Gefactureerd verbruik tegenover begin- en eindstanden, vermenigvuldigingsfactoren en geschatte standen.</p></div>
       <div><span class="ico">{{ icon('calendar') }}</span><h3>Periodes</h3><p>Overlappende, dubbele of ontbrekende factuurperiodes per aansluiting, ook tussen leveranciers.</p></div>
@@ -127,7 +227,7 @@
       <span class="label">Beveiliging en privacy</span>
       <h2>Uw facturen zijn vertrouwelijke bedrijfsinformatie. Zo gaan wij ermee om.</h2>
     </div>
-    <div class="trust">
+    <div class="trust" data-reveal>
       <div><span class="ico">{{ icon('lock') }}</span><div><h3>Versleuteld opgeslagen</h3><p>Documenten worden versleuteld bewaard en alleen getoond aan geautoriseerde medewerkers en uzelf.</p></div></div>
       <div><span class="ico">{{ icon('audit') }}</span><div><h3>Volledig auditspoor</h3><p>Inzage, downloads, exports en beslissingen worden vastgelegd. U weet altijd wie wat heeft gezien.</p></div></div>
       <div><span class="ico">{{ icon('shield') }}</span><div><h3>Alleen voor uw controle</h3><p>Uw gegevens worden uitsluitend gebruikt voor de controle en terugvordering, en nooit zonder uw toestemming gedeeld met externe AI-diensten.</p></div></div>

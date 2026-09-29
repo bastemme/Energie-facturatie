@@ -13,10 +13,10 @@
   {% if k.has_demo %}<div class="alert review">{{ icon('info') }}<span><b>Bevat test- of demodata.</b> {% if k.demo_leads %}{{ k.demo_leads }} leads komen uit de testbron (TESTDATA){% endif %}{% if k.demo_leads and k.demo_clients %} en {% endif %}{% if k.demo_clients %}{{ k.demo_clients }} klant(en) zijn synthetische demo's{% endif %}. Ze tellen mee in de cijfers hieronder en zijn overal gemarkeerd.</span></div>{% endif %}
 
   <section class="figures" aria-label="Geld">
-    <div class="figure lead recovered"><span class="label"><i class="key positive"></i>Teruggevorderd</span><span class="value">{{ m.recovered|eur }}</span><span class="sub">Daadwerkelijk ontvangen door klanten</span></div>
-    <div class="figure"><span class="label"><i class="key review"></i>Mogelijke terugvordering</span><span class="value">{{ m.potential_discrepancies|eur }}</span><span class="sub">Nog te verifiëren, geen vordering</span></div>
-    <div class="figure"><span class="label"><i class="key brand"></i>Bevestigd</span><span class="value">{{ m.confirmed_discrepancies|eur }}</span><span class="sub">Na beoordeling door een specialist</span></div>
-    <div class="figure"><span class="label"><i class="key"></i>Succesvergoeding</span><span class="value">{{ m.success_fee|eur }}</span><span class="sub">Uitbetaald aan klanten: {{ k.client_payout|eur }}</span></div>
+    <div class="figure lead recovered"><span class="label"><i class="key positive"></i>Teruggevorderd</span><span class="value">{{ ui.num(m.recovered, 'recovered', 'eur') }}</span><span class="sub">Daadwerkelijk ontvangen door klanten</span></div>
+    <div class="figure"><span class="label"><i class="key review"></i>Mogelijke terugvordering</span><span class="value">{{ ui.num(m.potential_discrepancies, 'potential', 'eur') }}</span><span class="sub">Nog te verifiëren, geen vordering</span></div>
+    <div class="figure"><span class="label"><i class="key brand"></i>Bevestigd</span><span class="value">{{ ui.num(m.confirmed_discrepancies, 'confirmed', 'eur') }}</span><span class="sub">Na beoordeling door een specialist</span></div>
+    <div class="figure"><span class="label"><i class="key"></i>Succesvergoeding</span><span class="value">{{ ui.num(m.success_fee, 'fee', 'eur') }}</span><span class="sub">Uitbetaald aan klanten: {{ k.client_payout|eur }}</span></div>
   </section>
 
   <section class="panel">
@@ -24,12 +24,12 @@
     <div class="table-wrap"><table class="table">
       <thead><tr><th>Totaal leads</th><th>Gekwalificeerd</th><th>E-mails verstuurd</th><th>Positieve reacties</th><th>Gesprekken</th><th>Facturen geanalyseerd</th></tr></thead>
       <tbody><tr class="kpi-row">
-        <td><a class="primary num" href="/app/leads">{{ k.leads }}</a></td>
-        <td><a class="primary num" href="/app/leads?qualification=good">{{ k.qualified }}</a></td>
-        <td><span class="primary num">{{ k.emails_sent }}</span>{% if k.emails_mock %}<span class="sub">waarvan {{ k.emails_mock }} {{ crm.env(False) }}</span>{% endif %}</td>
-        <td><a class="primary num" href="/app/inbox?show=all">{{ k.positive_responses }}</a></td>
-        <td><a class="primary num" href="/app/leads?stage=MEETING">{{ k.meetings }}</a></td>
-        <td><a class="primary num" href="/app/analyses">{{ k.invoices_analyzed }}</a></td>
+        <td><a class="primary num" href="/app/leads">{{ ui.num(k.leads, 'kpi-leads') }}</a></td>
+        <td><a class="primary num" href="/app/leads?qualification=good">{{ ui.num(k.qualified, 'kpi-qualified') }}</a></td>
+        <td><span class="primary num">{{ ui.num(k.emails_sent, 'kpi-sent') }}</span>{% if k.emails_mock %}<span class="sub">waarvan {{ k.emails_mock }} {{ crm.env(False) }}</span>{% endif %}</td>
+        <td><a class="primary num" href="/app/inbox?show=all">{{ ui.num(k.positive_responses, 'kpi-positive_responses') }}</a></td>
+        <td><a class="primary num" href="/app/leads?stage=MEETING">{{ ui.num(k.meetings, 'kpi-meetings') }}</a></td>
+        <td><a class="primary num" href="/app/analyses">{{ ui.num(k.invoices_analyzed, 'kpi-invoices_analyzed') }}</a></td>
       </tr></tbody>
     </table></div>
   </section>
@@ -43,7 +43,7 @@
         <a class="f-row" href="{{ s.href }}">
           <span class="f-label"><b>{{ s.label }}</b><span>{{ s.note }}</span></span>
           {{ funnel_bar(s.count, [top, s.count]|max, loop.index0) }}
-          <span class="f-n num">{{ s.count }}</span>
+          <span class="f-n num">{{ ui.num(s.count, 'funnel-' ~ s.key) }}</span>
           <span class="f-c num">{% if s.conversion is not none %}{{ (s.conversion * 100)|round|int }}%{% elif not loop.first and funnel[loop.index0 - 1].unit != s.unit %}<span class="muted" data-tip="Andere eenheid dan de vorige stap ({{ s.unit }})" tabindex="0">{{ s.unit }}</span>{% endif %}</span>
         </a>
         {% endfor %}
