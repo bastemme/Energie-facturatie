@@ -30,3 +30,18 @@ def db():
     finally:
         session.close()
         db_module.Base.metadata.drop_all(db_module.get_engine())
+
+
+@pytest.fixture
+def client_factory(db):
+    from decimal import Decimal
+
+    from app.models import Client
+
+    def make(name="Testbedrijf B.V.", fee="15"):
+        c = Client(company_name=name, success_fee_percentage=Decimal(fee), consent_given=True)
+        db.add(c)
+        db.flush()
+        return c
+
+    return make
