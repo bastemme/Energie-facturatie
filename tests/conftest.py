@@ -1,0 +1,32 @@
+import os
+
+os.environ.setdefault("ER_ENVIRONMENT", "test")
+os.environ.setdefault("ER_DATABASE_URL", "sqlite://")
+
+import pytest  # noqa: E402
+from cryptography.fernet import Fernet  # noqa: E402
+
+from app import db as db_module  # noqa: E402
+from app.config import get_settings  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _settings(tmp_path, monkeypatch):
+    monkeypatch.setenv("ER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("ER_STORAGE_ENCRYPTION_KEY", Fernet.generate_key().decode())
+    monkeypatch.setenv("ER_DATABASE_URL", "sqlite://")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+@pytest.fixture
+def db():
+    db_module.init_engine("sqlite://")
+    db_module.create_all()
+    session = db_module.session_factory()()
+    try:
+        yield session
+    finally:
+        session.close()
+        db_module.Base.metadata.drop_all(db_module.get_engine())
