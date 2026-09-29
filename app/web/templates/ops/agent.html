@@ -7,6 +7,8 @@
   {% call ui.page_head(agent.name, agent.description, [('AI Operations', '/app/ops')]) %}
     {{ ops.state(state) }}
     {% if agent.id == 'lead_researcher' %}<a class="btn btn-primary" href="/app/leads/find">{{ icon('search') }}Nieuw onderzoek</a>{% endif %}
+    {% set run_job = {'orchestrator': 'daily', 'finance': 'finance', 'analytics': 'analytics', 'qa': 'qa'}.get(agent.id) %}
+    {% if run_job and agent.enabled %}<form method="post" action="/app/ops/start" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="job" value="{{ run_job }}"><button class="btn btn-primary" type="submit">{{ icon('play') }}Nu uitvoeren</button></form>{% endif %}
     {% if user.role.value == 'ADMIN' and agent.implemented %}<form method="post" action="/app/ops/agents/{{ agent.id }}/toggle" class="inline">{{ ui.csrf_field() }}<button class="btn {{ 'btn-danger' if agent.enabled else '' }}" type="submit">{{ 'Uitschakelen' if agent.enabled else 'Inschakelen' }}</button></form>{% endif %}
   {% endcall %}
   {% if not agent.implemented %}<div class="alert info">{{ icon('info') }}<span><b>Deze agent is gedefinieerd maar nog niet gebouwd.</b> Identiteit, permissies en tools liggen vast; taken die andere agents aan hem overdragen, wachten in de wachtrij tot hij actief is.</span></div>{% endif %}

@@ -13,12 +13,16 @@ _SPECS: dict[str, AgentSpec] = {a.id: a for a in AGENTS}
 
 
 def _implementations() -> dict[str, Agent]:
+    from app.agents import operations_agents as ops
     from app.agents.lead_researcher import LeadResearcher
     from app.agents.pipeline import ContactResearcher, EmailAgent, FollowUpAgent, LeadQualifier, OutreachAgent
 
     return {"lead_researcher": LeadResearcher(), "lead_qualifier": LeadQualifier(),
             "contact_researcher": ContactResearcher(), "outreach": OutreachAgent(), "email": EmailAgent(),
-            "follow_up": FollowUpAgent()}
+            "follow_up": FollowUpAgent(), "invoice_intake": ops.InvoiceIntake(),
+            "invoice_analysis": ops.InvoiceAnalysis(), "audit": ops.AuditAgent(), "recovery": ops.RecoveryAgent(),
+            "claims": ops.ClaimsAgent(), "customer_success": ops.CustomerSuccess(), "finance": ops.FinanceAgent(),
+            "analytics": ops.AnalyticsAgent(), "qa": ops.QAAgent(), "orchestrator": ops.Orchestrator()}
 
 
 def get_spec(agent_id: str) -> AgentSpec | None:

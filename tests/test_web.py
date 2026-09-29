@@ -434,7 +434,13 @@ def test_upload_json_processing_flow(app_client):
     r = app_client.post(f"/app/clients/{client_id}/analyse", data={"csrf_token": token},
                         headers={"Accept": "application/json"})
     res = r.json()
-    assert res["findings_new"] >= 1 and res["rules"] >= 10
+    # the agents already analysed the upload (intake → analysis); a manual run finds the same findings again
+    assert res["findings_total"] >= 1 and res["rules"] >= 10
+    with session() as s:
+        from app.models import AgentTask
+
+        done = {t.agent_id: t.status.value for t in s.query(AgentTask).all()}
+    assert done.get("invoice_intake") == "COMPLETED" and done.get("invoice_analysis") == "COMPLETED"
 
 
 def test_human_readable_errors_and_empty_states(app_client):

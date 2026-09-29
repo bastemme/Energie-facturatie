@@ -19,7 +19,7 @@ def test_start_lead_research_from_ui_runs_to_completion(app_client):  # noqa: F8
     make_user("ops@fs.nl", Role.REVIEWER)
     login(app_client, "ops@fs.nl")
     r = app_client.get("/app/ops")
-    assert r.status_code == 200 and "Lead Researcher" in r.text and "Nog niet gebouwd" in r.text
+    assert r.status_code == 200 and "Lead Researcher" in r.text and "Nog niet gebouwd" not in r.text
     form = app_client.get("/app/ops/research/new")
     assert "TESTDATA" in form.text  # the test source is announced before starting
     token = csrf(app_client, "/app/ops/research/new")

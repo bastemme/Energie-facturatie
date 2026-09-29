@@ -239,3 +239,52 @@ def prospects_list(user: User = Depends(require_staff)):
 @router.get("/app/ops/prospects/{prospect_id}")
 def prospect_detail(prospect_id: str, user: User = Depends(require_staff)):
     return redirect(f"/app/leads/{prospect_id}")
+
+
+# ---------------------------------------------------------------- start an agent job from a button
+
+JOBS = {  # key: (agent, task_type, title, needs, workflow)
+    "daily": ("orchestrator", "plan_workflow", "Dagelijkse run", (), None),
+    "recover_client": ("orchestrator", "plan_workflow", "Terugvordering starten", ("client_id",), None),
+    "intake": ("invoice_intake", "intake_documents", "Documentintake", ("client_id",), "invoice_recovery"),
+    "analyse": ("invoice_analysis", "analyse_client", "Facturen analyseren", ("client_id",), "invoice_recovery"),
+    "audit": ("audit", "audit_findings", "Interne controle bevindingen", ("client_id",), None),
+    "prepare_cases": ("recovery", "prepare_case", "Dossiers voorbereiden", ("client_id",), "invoice_recovery"),
+    "client_update": ("customer_success", "client_update", "Statusupdate aan klant", ("client_id",), None),
+    "draft_claim": ("claims", "draft_claim", "Claimbrief opstellen", ("case_id",), None),
+    "submit_claim": ("claims", "submit_claim", "Claim indienen", ("case_id",), None),
+    "finance": ("finance", "finance_report", "Financieel overzicht", (), None),
+    "analytics": ("analytics", "analytics_report", "Prestatieoverzicht", (), None),
+    "qa": ("qa", "review_output", "Kwaliteitscontrole", (), None),
+}
+
+
+@router.post("/app/ops/start", dependencies=[Depends(verify_csrf)])
+def start_job(request: Request, background: BackgroundTasks, job: str = Form(...), client_id: str = Form(""),
+              case_id: str = Form(""), user: User = Depends(require_staff), db: Session = Depends(get_db)):
+    from app.models import Client, RecoveryCase
+
+    if job not in JOBS:
+        raise HTTPException(status_code=404)
+    agent_id, task_type, title, needs, workflow = JOBS[job]
+    payload: dict = {"goal": job} if agent_id == "orchestrator" else {}
+    if "client_id" in needs:
+        client = db.get(Client, client_id)
+        if client is None:
+            raise HTTPException(status_code=404)
+        payload["client_id"] = client.id
+        title = f"{title}: {client.company_name}"
+    if "case_id" in needs:
+        case = db.get(RecoveryCase, case_id)
+        if case is None:
+            raise HTTPException(status_code=404)
+        payload.update(case_id=case.id, client_id=case.client_id)
+        title = f"{title}: {case.reference}"
+    task = enqueue(db, agent_id, task_type, payload, title=title, workflow_id=workflow, created_by_user_id=user.id,
+                   client_id=payload.get("client_id"), priority=6)
+    audit(db, "agent.task_created", user=user, object_type="agent_task", object_id=task.id, ip=client_ip(request),
+          details={"agent": agent_id, "job": job})
+    db.commit()
+    _schedule(background)
+    flash(request, f"Taak #{task.number} gestart: {title}.", "success")
+    return redirect(f"/app/ops/tasks/{task.id}")

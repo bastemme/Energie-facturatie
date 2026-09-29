@@ -141,7 +141,8 @@ class ExecutionContext:
 
     # ------------------------------------------------------------------ agent-to-agent
     def handoff(self, to_agent: str, task_type: str, payload: dict, *, title: str, subject: str | None = None,
-                priority: int | None = None) -> AgentTask:
+                priority: int | None = None, workflow_id: str | None = None, client_id: str | None = None
+                ) -> AgentTask:
         from app.agents.queue import enqueue
         from app.agents.registry import get_spec
 
@@ -150,7 +151,8 @@ class ExecutionContext:
         if target is None:
             raise PermissionDenied(f"Onbekende agent: {to_agent}")
         child = enqueue(self.db, to_agent, task_type, payload, title=title, priority=priority or self.task.priority,
-                        parent=self.task, created_by_agent_id=self.agent.id)
+                        parent=self.task, created_by_agent_id=self.agent.id, workflow_id=workflow_id,
+                        client_id=client_id)
         self.db.add(AgentMessage(from_agent_id=self.agent.id, to_agent_id=to_agent, kind="HANDOFF",
                                  subject=subject or title, payload=payload, source_task_id=self.task.id,
                                  created_task_id=child.id))

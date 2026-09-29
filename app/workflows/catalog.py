@@ -42,8 +42,8 @@ WORKFLOWS = {
         (Stage("invoice_intake", "intake_documents", "Intake"),
          Stage("invoice_analysis", "analyse_client", "Analyse"),
          Stage("audit", "audit_findings", "Interne controle"),
-         Stage("recovery", "prepare_case", "Dossier"),
-         Stage("claims", "submit_claim", "Claim indienen", needs_approval=True),
+         Stage("recovery", "prepare_case", "Dossier", needs_approval=True),  # after a specialist confirmed findings
+         Stage("claims", "draft_claim", "Claimbrief"),
          Stage("finance", "finance_report", "Afrekening"))),
 }
 

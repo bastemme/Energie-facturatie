@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -201,7 +201,7 @@ def _wants_json(request: Request) -> bool:
 
 
 @router.post("/app/clients/{client_id}/upload", dependencies=[Depends(verify_csrf)])
-async def upload(client_id: str, request: Request, files: list[UploadFile] = File(...),
+async def upload(client_id: str, request: Request, background: BackgroundTasks, files: list[UploadFile] = File(...),
                  declared_type: str = Form(""), user: User = Depends(require_user), db: Session = Depends(get_db)):
     client = get_client_for(db, user, client_id)
     if not client.consent_given:
@@ -230,6 +230,17 @@ async def upload(client_id: str, request: Request, files: list[UploadFile] = Fil
             db.rollback()
             results.append({"name": name, "ok": False, "status": "REJECTED", "message": str(exc), "invoices": 0,
                             "lines": 0, "readings": 0})
+    new_docs = [r["url"].rsplit("/", 1)[1] for r in results if r["ok"] and r.get("url")]
+    if new_docs and get_settings().agents_autorun:
+        # The agents take it from here: intake → analysis → internal audit (findings still need a specialist).
+        from app.agents.queue import enqueue
+        from app.agents.runner import kick
+
+        enqueue(db, "invoice_intake", "intake_documents", {"client_id": client.id, "document_ids": new_docs},
+                title=f"Nieuwe documenten van {client.company_name}", workflow_id="invoice_recovery",
+                client_id=client.id, created_by_user_id=user.id, priority=6)
+        db.commit()
+        background.add_task(kick)
     if _wants_json(request):
         return JSONResponse({"files": results, "can_analyse": user.is_staff})
     done = [r for r in results if r["ok"]]

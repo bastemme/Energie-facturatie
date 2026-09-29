@@ -179,4 +179,20 @@ def activity(db: Session, limit: int = 30) -> list[Activity]:
             actor, kind = "Systeem", "system"
         out.append(Activity(e.created_at, actor, kind, e.message, e.prospect_id, companies.get(e.prospect_id),
                             e.task_id))
-    return out
+    # Task results of every agent (invoices, recovery, reports) and human approval decisions.
+    for log in db.scalars(select(AgentLog).where(AgentLog.event.in_(("task.completed", "task.failed",
+                                                                      "approval.decided")))
+                          .order_by(AgentLog.created_at.desc()).limit(limit)):
+        human = log.event == "approval.decided"
+        out.append(Activity(log.created_at, "Mens" if human else names.get(log.agent_id, log.agent_id),
+                            "human" if human else "agent",
+                            ("Mislukt: " if log.event == "task.failed" else "") + log.message, None, None,
+                            log.task_id))
+    out.sort(key=lambda a: _aware(a.at), reverse=True)
+    return out[:limit]
+
+
+def _aware(ts):
+    from datetime import UTC
+
+    return ts if ts.tzinfo else ts.replace(tzinfo=UTC)

@@ -7,6 +7,7 @@
 <div class="page page-wide" data-pulse="/app/ops/pulse" data-pulse-v="{{ pulse }}">
   {% call ui.page_head('AI Operations', 'De hele pijplijn live: wat elke agent doet, wat op u wacht en wat er net is gebeurd.') %}
     <span class="row small muted">Onderzoek {{ crm.env(not research.is_test_data) }} E-mail {{ crm.env(mail.live) }}</span>
+<form method="post" action="/app/ops/start" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="job" value="daily"><button class="btn" type="submit">{{ icon('flow') }}Dagelijkse run</button></form>
     <form method="post" action="/app/ops/run" class="inline">{{ ui.csrf_field() }}<button class="btn" type="submit" data-tip="Verwerk nu alle taken die klaarstaan">{{ icon('play') }}Wachtrij verwerken</button></form>
     <form method="post" action="/app/inbox/fetch" class="inline">{{ ui.csrf_field() }}<button class="btn" type="submit"{% if not mail.can_read %} disabled{% endif %}>{{ icon('inbox') }}Mailbox lezen</button></form>
     <a class="btn btn-primary" href="/app/leads/find">{{ icon('search') }}Leads zoeken</a>
@@ -44,7 +45,7 @@
         {% for a in activity %}
         <li><time>{{ a.at|hms }}</time>
           <span class="who {{ a.actor_kind }}">{% if a.actor_kind == 'agent' %}{{ ops.mono(a.actor)|striptags }}{% elif a.actor_kind == 'human' %}{{ icon('user') }}{% else %}{{ icon('settings') }}{% endif %}</span>
-          <span class="what"><b>{{ a.actor }}</b> <span class="msg">{{ a.message }}</span>{% if a.company %}<span class="co"><a href="/app/leads/{{ a.prospect_id }}">{{ a.company }}</a>{% if a.task_id %} · <a href="/app/ops/tasks/{{ a.task_id }}">taak</a>{% endif %} · {{ a.at|ago }}</span>{% endif %}</span>
+          <span class="what"><b>{{ a.actor }}</b> <span class="msg">{{ a.message }}</span><span class="co">{% if a.company %}<a href="/app/leads/{{ a.prospect_id }}">{{ a.company }}</a> · {% endif %}{% if a.task_id %}<a href="/app/ops/tasks/{{ a.task_id }}">taak</a> · {% endif %}{{ a.at|ago }}</span></span>
         </li>
         {% endfor %}
       </ol>

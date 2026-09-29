@@ -4,7 +4,7 @@
 <div class="page">
   {% call ui.page_head('Dossier ' ~ case.reference, case.supplier ~ ' · ' ~ items|length ~ ' bevinding(en) · aangemaakt ' ~ (case.created_at|d), ([('Dossiers', '/app/cases')] if user.is_staff else []) + [(client.company_name, '/app/clients/' ~ client.id ~ '?tab=dossiers')]) %}
     {{ ui.case_chip(case.status) }}
-    {% if user.is_staff %}<a class="btn btn-primary" href="/app/cases/{{ case.id }}/package.zip">{{ icon('download') }}Claimpakket</a>{% endif %}
+    {% if user.is_staff %}<form method="post" action="/app/ops/start" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="job" value="draft_claim"><input type="hidden" name="case_id" value="{{ case.id }}"><button class="btn" type="submit">{{ icon('edit') }}Claimbrief opstellen</button></form>{% if case.status.value in ('CLAIM_PREPARED', 'CLIENT_APPROVAL') %}<form method="post" action="/app/ops/start" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="job" value="submit_claim"><input type="hidden" name="case_id" value="{{ case.id }}"><button class="btn" type="submit">{{ icon('send') }}Indienen (met goedkeuring)</button></form>{% endif %}<a class="btn btn-primary" href="/app/cases/{{ case.id }}/package.zip">{{ icon('download') }}Claimpakket</a>{% endif %}
   {% endcall %}
 
   <section class="panel panel-pad stack">

@@ -73,8 +73,7 @@ def test_sync_agents_registers_all_16_and_keeps_runtime_state(agents):
     db = agents
     rows = db.scalars(select(AgentRecord)).all()
     assert len(rows) == 16
-    assert {r.id for r in rows if r.implemented} == {"lead_researcher", "lead_qualifier", "contact_researcher",
-                                                     "outreach", "email", "follow_up"}
+    assert all(r.implemented for r in rows)  # all 16 agents are built
     rec = db.get(AgentRecord, "email")
     rec.enabled = False
     db.commit()
@@ -92,7 +91,8 @@ def test_enqueue_validates_agent_and_task_type(agents):
 
 def test_claim_respects_priority_readiness_and_implementation(agents):
     db = agents
-    enqueue(db, "invoice_intake", "intake_documents", {}, title="not built", priority=9)
+    enqueue(db, "invoice_intake", "intake_documents", {}, title="disabled agent", priority=9)
+    db.get(AgentRecord, "invoice_intake").enabled = False
     low = enqueue(db, "lead_researcher", "research_prospects", {}, title="low", priority=2)
     later = enqueue(db, "lead_researcher", "research_prospects", {}, title="later", priority=9)
     later.not_before = utcnow() + timedelta(minutes=5)
@@ -101,7 +101,7 @@ def test_claim_respects_priority_readiness_and_implementation(agents):
     first = claim_next(db)
     assert first.id == high.id and first.status == TaskStatus.RUNNING and first.attempts == 1
     assert claim_next(db).id == low.id
-    assert claim_next(db) is None  # 'later' not due, qualifier not implemented
+    assert claim_next(db) is None  # 'later' not due, intake agent disabled
     db.get(AgentRecord, "lead_researcher").enabled = False
     later.not_before = None
     db.commit()

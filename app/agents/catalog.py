@@ -27,8 +27,10 @@ AGENTS: list[AgentSpec] = [
         "workflows.", "Coördinator van alle workflows", "Coördinatie",
         _i("Je ontvangt doelen (bijv. 'vind 50 prospects in Brabant') en splitst ze op in taken voor de juiste "
            "agents volgens de workflowdefinities. Je voert zelf geen onderzoek of analyses uit."),
-        ("tasks.read", "tasks.create", "tasks.handoff", "context.read", "context.write"),
-        ("tasks.create",), ("plan_workflow",)),
+        ("tasks.read", "tasks.create", "tasks.handoff", "context.read", "context.write", "findings.read",
+         "clients.read"),
+        ("tasks.find_stuck", "tasks.requeue", "clients.needing_cases", "clients.load"), ("plan_workflow",),
+        version="1.0"),
     AgentSpec(
         "lead_researcher", "Lead Researcher", "Vindt Nederlandse bedrijven met een energie-intensief profiel in "
         "openbare bronnen en legt ze met onderbouwing vast.", "Prospectonderzoek", "Acquisitie",
@@ -81,55 +83,63 @@ AGENTS: list[AgentSpec] = [
         ("leads.read", "outreach.draft"), ("outreach.find_unanswered", "outreach.draft_message"),
         ("schedule_follow_up",), version="1.0"),
     AgentSpec(
-        "invoice_intake", "Invoice Intake", "Neemt aangeleverde documenten in ontvangst en zorgt dat ze correct "
-        "worden uitgelezen.", "Documentintake", "Facturen",
-        _i("Controleer of documenten compleet en leesbaar zijn. Markeer scans voor handmatige invoer."),
-        ("documents.read", "invoices.write", "tasks.handoff"), ("invoices.extract",), ("intake_documents",)),
+        "invoice_intake", "Invoice Intake", "Verwerkt aangeleverde documenten en meldt wat een mens moet aanvullen.",
+        "Documentintake", "Facturen",
+        _i("Verwerk documenten die nog niet zijn uitgelezen. Meld scans en onleesbare bestanden voor handmatige "
+           "invoer. Zijn er facturen, geef de klant dan door aan Invoice Analysis."),
+        ("documents.read", "invoices.write", "clients.read", "tasks.handoff"), ("clients.load", "invoices.intake"),
+        ("intake_documents",), version="1.0"),
     AgentSpec(
-        "invoice_analysis", "Invoice Analysis", "Start de controleregels en vat de bevindingen samen.",
+        "invoice_analysis", "Invoice Analysis", "Voert de controleregels uit en vat de bevindingen samen.",
         "Factuuranalyse", "Facturen",
         _i("Voer de deterministische controleregels uit. Je mag bevindingen samenvatten, maar nooit bedragen "
            "wijzigen of bevestigen."),
-        ("invoices.read", "analysis.run", "findings.read", "tasks.handoff"), ("analysis.run", "findings.list"),
-        ("analyse_client",)),
+        ("invoices.read", "analysis.run", "findings.read", "clients.read", "tasks.handoff"),
+        ("clients.load", "analysis.run"), ("analyse_client",), version="1.0"),
     AgentSpec(
-        "audit", "Audit", "Controleert bevindingen op onderbouwing en consistentie voordat een specialist ze "
+        "audit", "Audit", "Controleert bevindingen op bron, berekening en consistentie voordat een specialist ze "
         "beoordeelt.", "Interne controle", "Facturen",
-        _i("Controleer of elke bevinding een bron, berekening en passende zekerheid heeft. Je bevestigt niets."),
-        ("findings.read", "invoices.read", "qa.review", "tasks.handoff"), ("findings.list", "qa.review_output"),
-        ("audit_findings",)),
+        _i("Controleer of elke bevinding een bron, berekening en passende zekerheid heeft. Je bevestigt niets; "
+           "beoordelen doet een specialist."),
+        ("findings.read", "invoices.read", "clients.read", "context.write", "tasks.handoff"),
+        ("clients.load", "findings.audit"), ("audit_findings",), version="1.0"),
     AgentSpec(
         "recovery", "Recovery", "Bundelt bevestigde bevindingen per leverancier tot terugvorderingsdossiers.",
         "Dossiervorming", "Terugvordering",
-        _i("Maak alleen dossiers van door een specialist bevestigde bevindingen."),
-        ("findings.read", "cases.read", "cases.write", "tasks.handoff"), ("findings.list", "cases.prepare"),
-        ("prepare_case",)),
+        _i("Maak alleen dossiers van door een specialist bevestigde bevindingen, één per leverancier."),
+        ("findings.read", "cases.read", "cases.write", "clients.read", "tasks.handoff"),
+        ("clients.load", "cases.prepare"), ("prepare_case",), version="1.0"),
     AgentSpec(
-        "claims", "Claims", "Stelt correctieverzoeken op en dient ze na goedkeuring in.", "Claims bij leveranciers",
-        "Terugvordering",
-        _i("Gebruik feitelijke, niet-beschuldigende taal. Indienen altijd na goedkeuring van klant en specialist."),
-        ("cases.read", "claims.draft", "claims.submit", "tasks.handoff"), ("claims.draft_letter", "claims.submit"),
-        ("draft_claim", "submit_claim"), approval_actions=("claims.submit",)),
+        "claims", "Claims", "Stelt de claimbrief aan de leverancier op en registreert indiening na goedkeuring.",
+        "Claims bij leveranciers", "Terugvordering",
+        _i("Gebruik feitelijke, niet-beschuldigende taal (vaste sjabloon). Indienen registreer je alleen na "
+           "goedkeuring van een medewerker."),
+        ("cases.read", "cases.write", "claims.draft", "claims.submit", "tasks.handoff"),
+        ("cases.load", "claims.draft_letter", "claims.submit"), ("draft_claim", "submit_claim"),
+        approval_actions=("claims.submit",), version="1.0"),
     AgentSpec(
-        "customer_success", "Customer Success", "Houdt klanten op de hoogte van voortgang en ontbrekende "
-        "documenten.", "Klantcontact", "Terugvordering",
-        _i("Informeer klanten helder over de status. Noem mogelijke bedragen nooit als zekerheid."),
-        ("clients.read", "cases.read", "outreach.draft", "email.send"), ("outreach.draft_message", "email.send"),
-        ("client_update",), approval_actions=("email.send",)),
+        "customer_success", "Customer Success", "Stuurt klanten een statusupdate, pas na goedkeuring.",
+        "Klantcontact", "Terugvordering",
+        _i("Informeer klanten helder over de status. Noem mogelijke bedragen nooit als zekerheid. Versturen "
+           "alleen na goedkeuring."),
+        ("clients.read", "cases.read", "email.send"), ("clients.load", "clients.status_update", "email.send"),
+        ("client_update",), approval_actions=("email.send",), version="1.0"),
     AgentSpec(
-        "finance", "Finance", "Volgt ontvangen terugbetalingen, succesvergoedingen en facturatie aan klanten.",
+        "finance", "Finance", "Rapporteert ontvangen terugbetalingen, succesvergoedingen en uitkeringen.",
         "Financiën", "Terugvordering",
-        _i("Werk alleen met vastgelegde ontvangen bedragen en referenties."),
-        ("cases.read", "finance.read"), ("finance.metrics",), ("finance_report",)),
+        _i("Werk alleen met vastgelegde ontvangen bedragen en referenties. Mogelijke bedragen tellen niet mee."),
+        ("cases.read", "finance.read", "context.write"), ("finance.metrics",), ("finance_report",), version="1.0"),
     AgentSpec(
-        "analytics", "Analytics", "Rapporteert over de prestaties van pijplijn en controleregels.",
+        "analytics", "Analytics", "Rapporteert over de prestaties van pijplijn, agents en controleregels.",
         "Rapportage en inzichten", "Coördinatie",
         _i("Rapporteer cijfers met hun definitie. Het belangrijkste cijfer: teruggevorderd per 1.000 facturen."),
-        ("analytics.read", "finance.read", "tasks.read", "context.write"), ("analytics.metrics", "finance.metrics"),
-        ("analytics_report",)),
+        ("analytics.read", "finance.read", "tasks.read", "context.write"), ("analytics.metrics",),
+        ("analytics_report",), version="1.0"),
     AgentSpec(
-        "qa", "QA", "Beoordeelt steekproefsgewijs de uitvoer van andere agents.", "Kwaliteitsbewaking",
+        "qa", "QA", "Controleert de uitvoer van andere agents tegen de werkregels.", "Kwaliteitsbewaking",
         "Coördinatie",
-        _i("Toets uitvoer tegen de werkregels: bronnen, geen verzonnen gegevens, juiste toon. Meld afwijkingen."),
-        ("tasks.read", "qa.review", "prospects.read", "findings.read"), ("qa.review_output",), ("review_output",)),
+        _i("Toets uitvoer tegen de werkregels: bronnen, geen verzonnen gegevens, juiste toon. Meld afwijkingen; "
+           "wijzig zelf niets."),
+        ("tasks.read", "qa.review", "prospects.read", "findings.read"), ("qa.review_output",), ("review_output",),
+        version="1.0"),
 ]

@@ -8,15 +8,16 @@ from datetime import timedelta
 from sqlalchemy import func, select
 
 from app.agents.tools import ToolSpec, register
-from app.domain.enums import LeadStage, OutreachKind, OutreachStatus
+from app.domain.enums import LeadStage, OutreachKind, OutreachStatus, TaskStatus
 from app.domain.replies import classify_reply
 from app.integrations.email.provider import get_email_provider
 from app.integrations.web import contacts as web_contacts
 from app.integrations.web.research import get_research_provider
 from app.integrations.web.website import fetch_website
-from app.models import InboundMessage, OutreachMessage, Prospect
+from app.models import InboundMessage, OutreachMessage, Prospect, RecoveryCase
 from app.models.base import utcnow
-from app.services import crm, prospects
+from app.services import crm, operations, prospects
+from app.services.analysis import run_analysis
 
 
 def _search(sector_filters: list[str], area: str, limit: int, sector: str):
@@ -109,19 +110,61 @@ register(ToolSpec("email.classify_reply", "Classificeert een antwoord met vaste 
 register(ToolSpec("leads.apply_reply", "Werkt leadstatus, volgende actie en afmeldingen bij na een antwoord.",
                   "leads.write", crm.apply_classification, needs_db=True))
 
-# Planned tools — declared now so permissions and the dashboard are complete; implemented with their agent.
+# ---------------------------------------------------------------- invoices, recovery, platform
+
+
+def _requeue(db, task_ids: list[str], reason: str) -> int:
+    from app.models import AgentTask
+
+    n = 0
+    for t in db.scalars(select(AgentTask).where(AgentTask.id.in_(task_ids))):
+        t.status, t.error, t.not_before = TaskStatus.QUEUED, reason, None
+        n += 1
+    return n
+
+
+register(ToolSpec("clients.load", "Leest een klant (alleen lopende opdrachten).", "clients.read",
+                  lambda db, client_id: operations.active_client(db, client_id), needs_db=True,
+                  summarize=lambda c: {"client": c.id}))
+register(ToolSpec("invoices.intake", "Verwerkt nog niet uitgelezen documenten en meldt wat handwerk vraagt.",
+                  "invoices.write", operations.intake, needs_db=True,
+                  summarize=lambda r: {"processed_now": len(r.processed_now), "attention": len(r.attention),
+                                       "invoices": r.invoices}))
+register(ToolSpec("analysis.run", "Voert alle controleregels uit voor een klant.", "analysis.run",
+                  lambda db, client: run_analysis(db, client, None), needs_db=True,
+                  summarize=lambda r: {"findings": r.findings_total, "new": r.findings_new,
+                                       "errors": len(r.errors or [])}))
+register(ToolSpec("findings.audit", "Controleert bevindingen op bron, berekening en consistentie.", "findings.read",
+                  operations.audit_client, needs_db=True,
+                  summarize=lambda r: {"checked": r[1], "with_issues": sum(1 for _, i in r[0] if i)}))
+register(ToolSpec("cases.prepare", "Maakt dossiers per leverancier van bevestigde bevindingen.", "cases.write",
+                  operations.prepare_cases, needs_db=True, summarize=lambda r: {"cases": len(r[0])}))
+register(ToolSpec("cases.load", "Leest een terugvorderingsdossier.", "cases.read",
+                  lambda db, case_id: db.get(RecoveryCase, case_id), needs_db=True,
+                  summarize=lambda c: {"found": c is not None}))
+register(ToolSpec("claims.draft_letter", "Stelt de claimbrief aan de leverancier op (vaste sjabloon).",
+                  "claims.draft", operations.draft_claim, needs_db=True,
+                  summarize=lambda r: {"status_changed": r["status_changed"]}))
+register(ToolSpec("claims.submit", "Registreert dat de claim is ingediend (alleen na goedkeuring).",
+                  "claims.submit", operations.register_submission, needs_db=True))
+register(ToolSpec("clients.status_update", "Stelt een statusupdate voor de klant op.", "clients.read",
+                  operations.client_update, needs_db=True, summarize=lambda r: {"has_email": r is not None}))
+register(ToolSpec("finance.metrics", "Ontvangen bedragen, succesvergoedingen en uitkeringen.", "finance.read",
+                  operations.finance_report, needs_db=True, summarize=lambda r: {"sections": len(r["sections"])}))
+register(ToolSpec("analytics.metrics", "Prestaties van pijplijn, agents en controleregels.", "analytics.read",
+                  operations.analytics_report, needs_db=True, summarize=lambda r: {"sections": len(r["sections"])}))
+register(ToolSpec("qa.review_output", "Toetst recente uitvoer van agents aan de werkregels.", "qa.review",
+                  operations.qa_review, needs_db=True, summarize=lambda r: {"issues": r["issues"]}))
+register(ToolSpec("tasks.find_stuck", "Zoekt taken die te lang op 'bezig' staan.", "tasks.read",
+                  operations.stuck_tasks, needs_db=True, summarize=lambda r: {"stuck": len(r)}))
+register(ToolSpec("tasks.requeue", "Zet vastgelopen taken terug in de wachtrij.", "tasks.create", _requeue,
+                  needs_db=True, summarize=lambda n: {"requeued": n}))
+register(ToolSpec("clients.needing_cases", "Klanten met bevestigde bevindingen die nog in geen dossier zitten.",
+                  "findings.read", operations.clients_needing_cases, needs_db=True,
+                  summarize=lambda r: {"clients": len(r)}))
+
+# Planned tools — declared so permissions and the dashboard know them; not implemented yet.
 for name, desc, perm in [
     ("kvk.lookup", "Controleert bedrijfsgegevens in het KvK Handelsregister (API-sleutel nodig).", "web.search"),
-    ("leads.create", "Maakt een lead aan vanuit een gekwalificeerd bedrijf.", "leads.write"),
-    ("invoices.extract", "Leest geüploade facturen uit.", "invoices.write"),
-    ("analysis.run", "Voert de controleregels uit voor een klant.", "analysis.run"),
-    ("findings.list", "Leest bevindingen en hun onderbouwing.", "findings.read"),
-    ("cases.prepare", "Bereidt een terugvorderingsdossier voor.", "cases.write"),
-    ("claims.draft_letter", "Stelt een correctieverzoek aan de leverancier op.", "claims.draft"),
-    ("claims.submit", "Dient een claim in bij de leverancier.", "claims.submit"),
-    ("finance.metrics", "Leest omzet, succesvergoedingen en kosten.", "finance.read"),
-    ("analytics.metrics", "Leest prestatie-indicatoren van het platform.", "analytics.read"),
-    ("qa.review_output", "Beoordeelt de uitvoer van een andere agent tegen kwaliteitsregels.", "qa.review"),
-    ("tasks.create", "Maakt taken aan voor andere agents.", "tasks.create"),
 ]:
     register(ToolSpec(name, desc, perm))

@@ -23,7 +23,7 @@
   {% if task.status.value == 'QUEUED' and task.error %}<div class="alert review">{{ icon('clock') }}<span><b>Tijdelijke fout, er volgt automatisch een nieuwe poging.</b> {{ task.error }}</span></div>{% endif %}
   {% for a in approvals if a.status.value == 'PENDING' %}<section class="panel">{{ ops.approval_card(a, names, '/app/ops/tasks/' ~ task.id) }}</section>{% endfor %}
 
-  {% if out.summary and out.found is not defined %}<div class="alert {{ 'positive' if task.status.value == 'COMPLETED' else 'info' }}">{{ icon('check-circle') }}<span><b>Resultaat:</b> {{ out.summary }}</span></div>{% endif %}
+  {% if out.summary and out.found is not defined %}{% set weak = (out.sent is defined and not out.sent) or out.warnings or out.issues %}<div class="alert {{ 'review' if weak else ('positive' if task.status.value == 'COMPLETED' else 'info') }}">{{ icon('info' if weak else 'check-circle') }}<span><b>Resultaat:</b> {{ out.summary }}</span></div>{% endif %}
   {% if out.summary and out.found is defined %}
   <section class="figures" aria-label="Resultaat">
     <div class="figure lead"><span class="label">Resultaat</span><span class="value">{{ out.saved if out.saved is defined else '—' }}</span><span class="sub">{{ out.summary }}</span></div>
@@ -35,6 +35,16 @@
   </section>
   {% if out.test_data %}<div class="alert review">{{ icon('alert') }}<span><span class="testdata">TESTDATA</span> Dit resultaat komt uit de testbron (geen internet). Het zijn geen echte bedrijven.</span></div>{% endif %}
   {% endif %}
+
+  {% for sec in out.sections or [] %}
+  <section class="panel">
+    <div class="panel-head"><h2>{{ sec.title }}</h2><span class="small muted">{{ sec.rows|length }}</span></div>
+    {% if sec.rows %}<div class="table-wrap"><table class="table table-compact stack-sm"><thead><tr>{% for col in sec.columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in sec.rows %}<tr>{% for v in row %}<td data-label="{{ sec.columns[loop.index0] }}">{% if v.startswith('/app/') %}<a href="{{ v }}">Openen {{ icon('arrow-right') }}</a>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+    {% else %}<div class="panel-body small muted">Geen regels.</div>{% endif %}
+  </section>
+  {% endfor %}
+  {% if out.letter %}<section class="panel"><div class="panel-head"><div><h2>Claimbrief</h2><p>{{ out.subject }}</p></div>{% if out.case_id %}<a class="small" href="/app/cases/{{ out.case_id }}">Naar het dossier</a>{% endif %}</div><div class="mail-body">{{ out.letter }}</div></section>{% endif %}
 
   {% if prospects %}
   <section class="panel">

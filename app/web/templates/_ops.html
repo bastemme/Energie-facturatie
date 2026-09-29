@@ -24,6 +24,7 @@
 <div class="approval">
   <div class="row-between"><span class="small"><b>{{ names.get(a.agent_id, a.agent_id) }}</b> vraagt goedkeuring</span><span class="who">{{ a.requested_at|ago }}</span></div>
   <p>{{ a.summary }}</p>
+  {% if a.details and a.details.body %}<details class="disclose"><summary class="small">{{ icon('arrow-right') }} Tekst bekijken{% if a.details.to %} (aan {{ a.details.to }}){% endif %}</summary><div class="quoted small mt-xs">{{ a.details.body }}</div></details>{% endif %}
   <a class="small" href="/app/ops/tasks/{{ a.task_id }}">Taak bekijken {{ icon('arrow-right') }}</a>
   <form method="post" action="/app/ops/approvals/{{ a.id }}" class="stack">
     {{ ui.csrf_field() }}<input type="hidden" name="next_url" value="{{ next_url }}">

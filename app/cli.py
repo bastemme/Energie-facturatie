@@ -169,10 +169,16 @@ def cmd_agents(args) -> None:
     poll = get_settings().inbox_poll_minutes * 60
     live_inbox = get_email_provider().is_live and provider_status()["can_read"]
     print(f"Agent-worker gestart; controleert de wachtrij elke {args.interval} s"
-          + (f" en de mailbox elke {poll // 60} min" if live_inbox else "") + ". Stoppen: Ctrl+C.")
+          + (f" en de mailbox elke {poll // 60} min" if live_inbox else "") + "; dagelijkse run elke 24 uur. "
+          "Stoppen: Ctrl+C.")
     last_poll = 0.0
+    last_daily = 0.0
     try:
         while True:
+            if time.monotonic() - last_daily >= 24 * 3600:  # Orchestrator: inbox, follow-up, cases, QA, reports
+                with session_scope() as db:
+                    enqueue(db, "orchestrator", "plan_workflow", {"goal": "daily"}, title="Dagelijkse run", priority=3)
+                last_daily = time.monotonic()
             if live_inbox and time.monotonic() - last_poll >= poll:
                 with session_scope() as db:
                     enqueue(db, "email", "fetch_inbox", {}, title="Mailbox lezen (automatisch)", priority=4)

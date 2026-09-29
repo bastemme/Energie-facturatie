@@ -56,10 +56,10 @@ An agent asks the workflow for the next stage, so agents don't hard-code their s
 
 | Group | Agents | Status |
 |---|---|---|
-| Coördinatie | Orchestrator, QA, Analytics | Defined |
+| Coördinatie | Orchestrator, QA, Analytics | **Working** |
 | Acquisitie | Lead Researcher, Lead Qualifier, Contact Researcher, Outreach, Email, Follow-up | **All six working** (see below) |
-| Facturen | Invoice Intake, Invoice Analysis, Audit | Defined. The existing ingestion and detection services are their future tools. |
-| Terugvordering | Recovery, Claims, Customer Success, Finance | Defined |
+| Facturen | Invoice Intake, Invoice Analysis, Audit | **Working** (wrap the existing ingestion and detection) |
+| Terugvordering | Recovery, Claims, Customer Success, Finance | **Working** (claims submission and client e-mails need approval) |
 
 "Defined" means the agent has identity, instructions, permissions, tools (declared, `handler=None`) and task types,
 and appears on the dashboard. It becomes active once an implementation is added to `registry._implementations()`.
@@ -144,3 +144,26 @@ Every step also writes a `ProspectEvent` (timeline, shown in AI Operations as *L
 `data/mock_mail`). Choose with `ER_EMAIL_PROVIDER`. A live provider without configuration fails with a message
 naming the missing variables; it never falls back to the mock. The web app (and `python -m app.cli agents
 worker`) reads a live mailbox every `ER_INBOX_POLL_MINUTES`.
+
+
+## Invoice, recovery and platform agents
+
+All built on the existing deterministic services (`app/services/operations.py`); they add permissions, logging,
+approvals and handoffs, never new calculations.
+
+| Agent | Does | Human step |
+|---|---|---|
+| Invoice Intake | Processes documents that were stored but not read; lists scans and unreadable files | Manual entry for scans |
+| Invoice Analysis | Runs all detection rules (`run_analysis`) | — |
+| Audit | Checks every finding for source, calculation and consistent confidence; confirms nothing | A specialist reviews findings |
+| Recovery | One case per supplier from **confirmed** findings (`create_case`) | — |
+| Claims | Drafts the supplier letter (existing template); VERIFIED → CLAIM_PREPARED; registers SUBMITTED | Submission always needs approval |
+| Customer Success | Status e-mail to the client (potential money always called "mogelijk") | Always approval; the approved text is what is sent |
+| Finance | Received money, success fee, client payout per client; fees to invoice; missing references | — |
+| Analytics | Funnel, agent performance, detector precision | — |
+| QA | Checks recent e-mails, contacts, leads and findings against the working rules; changes nothing | — |
+| Orchestrator | Goals: `daily` (re-queue stuck tasks, read inbox, follow-ups, cases for confirmed findings, QA, finance, analytics), `find_leads`, `recover_client` | — |
+
+Triggers: an upload starts Intake → Analysis → Audit automatically; buttons on the client page (*Agents laten
+werken*, *Statusupdate klant*), the case page (*Claimbrief opstellen*, *Indienen*), agent pages (*Nu uitvoeren*)
+and AI Operations (*Dagelijkse run*). The worker (`python -m app.cli agents worker`) runs the daily run every 24 h.
