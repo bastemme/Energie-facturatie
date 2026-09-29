@@ -1,0 +1,59 @@
+{% extends "app_base.html" %}
+{% import "_ops.html" as ops with context %}
+{% block title %}{{ agent.name }}{% endblock %}
+{% block content %}
+{% set PERMS = {'tasks.read':1} %}
+<div class="page">
+  {% call ui.page_head(agent.name, agent.description, [('AI Operations', '/app/ops')]) %}
+    {{ ops.state(state) }}
+    {% if agent.id == 'lead_researcher' %}<a class="btn btn-primary" href="/app/ops/research/new">{{ icon('search') }}Nieuw onderzoek</a>{% endif %}
+    {% if user.role.value == 'ADMIN' and agent.implemented %}<form method="post" action="/app/ops/agents/{{ agent.id }}/toggle" class="inline">{{ ui.csrf_field() }}<button class="btn {{ 'btn-danger' if agent.enabled else '' }}" type="submit">{{ 'Uitschakelen' if agent.enabled else 'Inschakelen' }}</button></form>{% endif %}
+  {% endcall %}
+  {% if not agent.implemented %}<div class="alert info">{{ icon('info') }}<span><b>Deze agent is gedefinieerd maar nog niet gebouwd.</b> Identiteit, permissies en tools liggen vast; taken die andere agents aan hem overdragen, wachten in de wachtrij tot hij actief is.</span></div>{% endif %}
+  {% if agent.last_error and state == 'failed' %}<div class="alert critical">{{ icon('alert') }}<span><b>Laatste fout:</b> {{ agent.last_error }}</span></div>{% endif %}
+
+  <div class="grid-3-1">
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><h2>Identiteit</h2><span class="tag">{{ agent.id }} · v{{ agent.definition_version }}</span></div>
+        <div class="panel-body"><dl class="dl">
+          <dt>Rol</dt><dd>{{ agent.role }}</dd>
+          <dt>Domein</dt><dd>{{ agent.group }}</dd>
+          <dt>Taaktypes</dt><dd>{% for t in spec.task_types %}<span class="tag">{{ t }}</span> {% endfor %}</dd>
+          <dt>Workflows</dt><dd>{% for w in workflows %}{{ w.name }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
+          <dt>Laatste run</dt><dd>{{ agent.last_run_at|ago }}</dd>
+          <dt>Taken</dt><dd class="num">{{ stats.get('COMPLETED', 0) }} afgerond · {{ stats.get('FAILED', 0) }} mislukt · {{ stats.get('QUEUED', 0) }} in wachtrij</dd>
+        </dl></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><h2>Systeeminstructies</h2><p>Leidend voor het gedrag van de agent; gedeelde werkregels gelden voor alle agents.</p></div></div>
+        <pre class="letter">{{ agent.system_instructions }}</pre>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Taken</h2></div>
+        {% if tasks %}<ul class="tasklist">{% for t in tasks %}{{ ops.task_row(t, {agent.id: agent.name}) }}{% endfor %}</ul>
+        {% else %}{{ ui.empty('clock', 'Nog geen taken', 'Taken voor deze agent verschijnen hier.') }}{% endif %}
+      </section>
+    </div>
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><h2>Permissies</h2><span class="small muted">{{ agent.permissions|length }}</span></div>
+        <div class="panel-body row">{% for p in agent.permissions %}{{ ui.chip(p, 'brand' if p.endswith('.write') or p in ('email.send','claims.submit','tasks.handoff') else 'neutral') }}{% endfor %}</div>
+        {% if spec.approval_actions %}<div class="panel-foot">Altijd na goedkeuring: {% for a in spec.approval_actions %}<span class="tag">{{ a }}</span> {% endfor %}</div>{% endif %}
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Tools</h2></div>
+        <ul class="tasklist">{% for name, tool in tools %}<li><div class="panel-pad">
+          <div class="row-between"><span class="tag">{{ name }}</span>{{ ui.chip('Beschikbaar', 'positive') if tool and tool.implemented else ui.chip('Gepland', 'quiet') }}</div>
+          {% if tool %}<p class="small muted mt-xs">{{ tool.description }} <span class="tag">{{ tool.permission }}</span></p>{% endif %}
+        </div></li>{% endfor %}</ul>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Recente logregels</h2></div>
+        {% if logs %}<div class="panel-body"><ul class="logstream compact">{% for l in logs[:12] %}<li class="lv-{{ l.level }}"><time>{{ l.created_at|hms }}</time><span><span class="lg-ev">{{ l.event }}</span><span class="msg">{{ l.message }}</span></span><span class="dur">{{ l.duration_ms|duration if l.duration_ms is not none else '' }}</span></li>{% endfor %}</ul></div>
+        {% else %}<div class="panel-body small muted">Nog geen activiteit.</div>{% endif %}
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

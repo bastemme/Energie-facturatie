@@ -1,0 +1,29 @@
+{% extends "app_base.html" %}
+{% import "_ops.html" as ops with context %}
+{% block title %}Onderzochte bedrijven{% endblock %}
+{% block content %}
+<div class="page">
+  {% call ui.page_head('Onderzochte bedrijven', total ~ ' bedrijven gevonden door de Lead Researcher. Alleen bedrijfsgegevens, met bron.', [('AI Operations', '/app/ops')]) %}
+    <a class="btn btn-primary" href="/app/ops/research/new">{{ icon('search') }}Nieuw onderzoek</a>
+  {% endcall %}
+  <form method="get" class="row" data-no-loading>
+    <div class="field"><label for="f-sector" class="sr-only">Sector</label><select id="f-sector" name="sector"><option value="">Alle sectoren</option>{% for k, s in sectors.items() %}<option value="{{ k }}" {% if filters.sector == k %}selected{% endif %}>{{ s.label }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="f-status" class="sr-only">Status</label><select id="f-status" name="status"><option value="">Alle statussen</option>{% for k, l in [('RESEARCHED','Onderzocht'),('QUALIFIED','Gekwalificeerd'),('DISQUALIFIED','Afgewezen'),('CONTACTED','Benaderd'),('CONVERTED','Klant')] %}<option value="{{ k }}" {% if filters.status == k %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <button class="btn btn-sm" type="submit">Filteren</button>
+  </form>
+  <section class="panel">
+    {% if prospects %}
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Bedrijf</th><th>Sector</th><th>Plaats</th><th>Signalen</th><th>Gevonden</th><th class="r">Fitscore</th></tr></thead>
+      <tbody>{% for p in prospects %}<tr>
+        <td><a class="primary" href="/app/ops/prospects/{{ p.id }}">{{ p.company_name }}</a><span class="sub">{{ p.domain or 'geen website' }}</span></td>
+        <td data-label="Sector">{{ sectors[p.sector].label if p.sector in sectors else p.sector }}</td>
+        <td data-label="Plaats">{{ p.city or '—' }}</td>
+        <td class="small" data-label="Signalen">{% if p.is_test_data %}<span class="testdata">TESTDATA</span> {% endif %}{% if p.kvk_number %}{{ ui.chip('KvK', 'neutral') }} {% endif %}{% if p.signals and p.signals.multi_location %}{{ ui.chip('Meerdere locaties', 'brand') }} {% endif %}{% if p.brand %}{{ ui.chip('Filiaal', 'quiet') }}{% endif %}</td>
+        <td class="small muted" data-label="Gevonden">{{ p.created_at|ago }}</td>
+        <td class="r" data-label="Fitscore">{{ ops.score(p.fit_score, qualify) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{% call ui.empty('search', 'Nog geen onderzochte bedrijven', 'Start een leadonderzoek: kies sectoren en een regio, en de Lead Researcher legt passende bedrijven vast met onderbouwing.') %}<a class="btn btn-primary" href="/app/ops/research/new">{{ icon('search') }}Nieuw onderzoek</a>{% endcall %}{% endif %}
+  </section>
+</div>
+{% endblock %}

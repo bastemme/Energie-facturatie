@@ -56,7 +56,42 @@ def _price(v) -> str:
     return "—" if v is None else "€ " + format_price(Decimal(v))
 
 
-templates.env.filters.update(eur=format_eur, nl=_num, d=_date, pct=_pct, cat=_cat, unit=_unit, price=_price)
+def _ago(v) -> str:
+    if v is None:
+        return "—"
+    from app.models.base import utcnow
+
+    now = utcnow()
+    if v.tzinfo is None:
+        v = v.replace(tzinfo=now.tzinfo)
+    secs = int((now - v).total_seconds())
+    if secs < 45:
+        return "zojuist"
+    if secs < 3600:
+        return f"{max(1, secs // 60)} min geleden"
+    if secs < 86400:
+        return f"{secs // 3600} uur geleden"
+    return v.strftime("%d-%m-%Y")
+
+
+def _duration(ms) -> str:
+    if ms is None:
+        return "—"
+    return f"{ms} ms" if ms < 1000 else f"{ms / 1000:.1f} s".replace(".", ",")
+
+
+def _pretty(v) -> str:
+    import json
+
+    return json.dumps(v, indent=2, ensure_ascii=False, default=str)
+
+
+def _time(v) -> str:
+    return v.strftime("%H:%M:%S") if v else ""
+
+
+templates.env.filters.update(eur=format_eur, nl=_num, d=_date, pct=_pct, cat=_cat, unit=_unit, price=_price,
+                             ago=_ago, duration=_duration, pretty=_pretty, hms=_time)
 from app.web.icons import LOGO, icon  # noqa: E402
 from app.web.view import finding_view, fmt_value, meter_bar  # noqa: E402
 

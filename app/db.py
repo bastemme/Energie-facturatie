@@ -61,7 +61,35 @@ def get_engine() -> Engine:
 def create_all() -> None:
     import app.models  # noqa: F401  (register models)
 
-    Base.metadata.create_all(get_engine())
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+    add_missing_columns(engine)
+
+
+def add_missing_columns(engine: Engine) -> list[str]:
+    """Additive schema upgrade: add new nullable columns to existing tables.
+
+    Keeps existing (demo) databases working when a model gains a column. It never drops, renames or changes
+    columns; anything beyond adding a nullable column needs a real migration (see docs/operations.md).
+    """
+    from sqlalchemy import inspect, text
+
+    added = []
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if table.name not in existing_tables:
+                continue
+            present = {c["name"] for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in present or not column.nullable or column.primary_key:
+                    continue
+                col_type = column.type.compile(dialect=engine.dialect)
+                # names come from our own metadata, never from user input
+                conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {col_type}'))  # noqa: S608
+                added.append(f"{table.name}.{column.name}")
+    return added
 
 
 def session_factory() -> sessionmaker[Session]:

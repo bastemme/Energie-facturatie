@@ -1,0 +1,33 @@
+{% extends "app_base.html" %}
+{% block title %}Nieuw leadonderzoek{% endblock %}
+{% block content %}
+<div class="page">
+  {{ ui.page_head('Nieuw leadonderzoek', 'De Lead Researcher zoekt bestaande bedrijven in openbare bronnen, leest hun website en bepaalt per bedrijf een onderbouwde fitscore.', [('AI Operations', '/app/ops'), ('Lead Researcher', '/app/ops/agents/lead_researcher')]) }}
+  {% if provider.is_test_data %}<div class="alert review">{{ icon('alert') }}<span><span class="testdata">TESTDATA</span> De onderzoeksbron staat op <b>testdata</b> (ER_RESEARCH_PROVIDER=mock). Resultaten zijn gemarkeerd en geen echte bedrijven.</span></div>
+  {% else %}<div class="alert info">{{ icon('info') }}<span>Bron: <b>{{ provider.label }}</b> (© OpenStreetMap-bijdragers) en de eigen websites van de bedrijven. Er worden alleen bedrijfsgegevens opgeslagen, geen persoonsgegevens.</span></div>{% endif %}
+  <form method="post" action="/app/ops/research" class="panel">
+    {{ ui.csrf_field() }}
+    <div class="form-section">
+      <h3>Sectoren</h3><p>Bedrijven met een hoog of continu energieverbruik hebben de meeste kans op relevante afwijkingen.</p>
+      <div class="sector-pick">{% for s in sectors %}<label><input type="checkbox" name="sectors" value="{{ s.key }}"{% if s.key in ('bakeries','supermarkets') %} checked{% endif %}><span><b>{{ s.label }}</b><span>Energieprofiel {{ s.energy_profile }} · {{ s.why }}</span></span></label>{% endfor %}</div>
+    </div>
+    <div class="form-section">
+      <h3>Regio en omvang</h3>
+      <div class="fields">
+        <div class="field"><label for="area">Gemeente, plaats of provincie</label><input id="area" name="area" type="text" required maxlength="80" placeholder="Bijv. Tilburg of Noord-Brabant"><span class="hint">Gebruik de officiële naam, zoals op de kaart.</span></div>
+        <div class="field"><label for="limit">Maximum per sector</label><input id="limit" name="limit" type="number" min="1" max="{{ max_limit }}" value="20"><span class="hint">Meer dan {{ threshold }} bedrijven in totaal vraagt eerst goedkeuring.</span></div>
+      </div>
+      <label class="check"><input type="checkbox" name="require_website" checked><span>Alleen bedrijven met een eigen website (beter te controleren en te benaderen)</span></label>
+    </div>
+    <div class="form-section">
+      <h3>Wat er daarna gebeurt</h3>
+      <ol class="spoor">
+        <li><span class="node on"></span><div class="step-label">Onderzoek</div><p class="small">Zoeken per sector, websites lezen, dubbelingen overslaan.</p></li>
+        <li><span class="node on"></span><div class="step-label">Fitscore</div><p class="small">Vaste, uitlegbare regels: sector, website, KvK-nummer, meerdere locaties, filiaal van een keten.</p></li>
+        <li><span class="node"></span><div class="step-label">Overdracht</div><p class="small">Bedrijven met score {{ qualify }} of hoger gaan naar de Lead Qualifier.</p></li>
+      </ol>
+    </div>
+    <div class="form-foot"><a class="btn" href="/app/ops">Annuleren</a><button class="btn btn-primary" type="submit">{{ icon('search') }}Onderzoek starten</button></div>
+  </form>
+</div>
+{% endblock %}

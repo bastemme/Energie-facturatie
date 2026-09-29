@@ -45,6 +45,16 @@ class Settings(BaseSettings):
     ai_provider: str = "none"
     anthropic_api_key: str | None = None
 
+    # AI Operations / agents
+    agents_autorun: bool = True  # run queued tasks in the background right after they are created
+    research_provider: str = "openstreetmap"  # openstreetmap | mock (development/tests, clearly marked)
+    overpass_url: str = "https://overpass-api.de/api/interpreter"
+    research_user_agent: str = "Factuurspoor-LeadResearcher/0.1 (+https://factuurspoor.nl; info@example.nl)"
+    research_fetch_timeout: float = 8.0
+    research_max_website_fetches: int = 15
+    research_approval_threshold: int = 50  # larger research tasks need a human approval first
+    lead_qualify_threshold: int = 55  # fit score from which prospects are handed to the Lead Qualifier
+
     # Optional outbound webhook for lead/CRM integration (POST JSON, no invoice data)
     lead_webhook_url: str | None = None
 

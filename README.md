@@ -8,7 +8,8 @@ and turns confirmed findings into recovery claims on a no cure, no pay basis.
 > Every finding traces back to a document, page and line.
 
 See **[docs/product-architecture.md](docs/product-architecture.md)** for the architecture, data model and
-design decisions, and **[docs/operations.md](docs/operations.md)** for deployment and operations.
+design decisions, **[docs/agent-architecture.md](docs/agent-architecture.md)** for the AI agents, and
+**[docs/operations.md](docs/operations.md)** for deployment and operations.
 
 ## Quick look (no technical knowledge needed)
 
@@ -34,6 +35,7 @@ echo "ER_ENVIRONMENT=development" >> .env
 uv run python -m app.cli create-admin you@example.nl
 uv run python -m app.cli seed-demo   # optional: SYNTHETIC demo client with known errors
 uv run uvicorn app.main:app --reload
+uv run python -m app.cli agents worker   # optional: separate agent worker (the web app also runs tasks)
 # open http://127.0.0.1:8000  (landing page)  and  /login
 ```
 
@@ -58,6 +60,9 @@ The suite includes synthetic invoices (rendered as real PDFs) with known errors.
 | `app/extraction/` | Dutch number/date parsing, PDF text with coordinates, invoice parser, CSV/XLSX import |
 | `app/detection/` | Rules engine: one module per detector, versioned, no DB/LLM access |
 | `app/services/` | Analysis runs, review, cases (state machine), metrics, reports, correspondence, GDPR, audit |
+| `app/agents/` | Agent framework (registry, queue, runner, permissions, approvals, logs) and the agents |
+| `app/workflows/` | Workflow stages and handoffs between agents |
+| `app/integrations/` | External sources (OpenStreetMap, company websites) behind a safe HTTP layer, plus a test source |
 | `app/ai/` | AI boundary (off by default; never a source of numbers) |
 | `app/web/` | FastAPI routes, Jinja templates (Dutch UI), security helpers |
 | `app/devtools/synthetic.py` | Synthetic invoice generator (marked as such) |

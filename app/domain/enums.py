@@ -166,3 +166,34 @@ class LeadStatus(StrEnum):
     QUALIFIED = "QUALIFIED"
     CONVERTED = "CONVERTED"
     DISQUALIFIED = "DISQUALIFIED"
+
+
+class AgentStatus(StrEnum):
+    IDLE = "IDLE"
+    RUNNING = "RUNNING"
+    WAITING = "WAITING"  # waiting for a human approval
+    FAILED = "FAILED"  # last execution failed
+    DISABLED = "DISABLED"
+
+
+class TaskStatus(StrEnum):
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    WAITING_APPROVAL = "WAITING_APPROVAL"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class ApprovalStatus(StrEnum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class ProspectStatus(StrEnum):
+    RESEARCHED = "RESEARCHED"
+    QUALIFIED = "QUALIFIED"
+    DISQUALIFIED = "DISQUALIFIED"
+    CONTACTED = "CONTACTED"
+    CONVERTED = "CONVERTED"

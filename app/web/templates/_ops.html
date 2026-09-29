@@ -1,0 +1,36 @@
+{% import "_ui.html" as ui with context %}
+{% set STATE_NL = {'running':'Actief','idle':'Beschikbaar','waiting':'Wacht op goedkeuring','failed':'Laatste taak mislukt','disabled':'Uitgeschakeld','planned':'Nog niet gebouwd'} %}
+{% set TASK_NL = {'QUEUED':('In wachtrij','neutral'),'RUNNING':('Bezig','brand'),'WAITING_APPROVAL':('Wacht op goedkeuring','review'),'COMPLETED':('Afgerond','positive'),'FAILED':('Mislukt','critical'),'CANCELLED':('Geannuleerd','quiet')} %}
+
+{% macro state(s) %}<span class="state {{ s }}">{{ STATE_NL[s] }}</span>{% endmacro %}
+
+{% macro task_chip(status) %}{% set m = TASK_NL[status.value] %}{{ ui.chip(m[0], m[1]) }}{% endmacro %}
+
+{% macro mono(name) %}{% set parts = name.replace('-', ' ').split() %}<span class="ag-mono" aria-hidden="true">{{ (parts[0][0] ~ (parts[1][0] if parts|length > 1 else parts[0][1]))|upper }}</span>{% endmacro %}
+
+{% macro task_icon(status) %}{% set m = {'RUNNING':('running','settings'),'FAILED':('failed','alert'),'COMPLETED':('done','check'),'WAITING_APPROVAL':('waiting','shield'),'CANCELLED':('','close'),'QUEUED':('','clock')}[status.value] %}<span class="t-icon {{ m[0] }}">{{ icon(m[1]) }}</span>{% endmacro %}
+
+{% macro task_row(t, names, runnable=None, side=None) %}
+<li><a href="/app/ops/tasks/{{ t.id }}">
+  {{ task_icon(t.status) }}
+  <span><span class="t-title">{{ t.title }}</span>
+    <span class="t-meta">{{ names.get(t.agent_id, t.agent_id) }}{% if t.status.value == 'QUEUED' and runnable is not none and t.agent_id not in runnable %} · wacht tot deze agent gebouwd is{% elif t.status.value == 'FAILED' and t.error %} · {{ t.error }}{% endif %}</span></span>
+  <span class="t-side">{{ side or (t.duration_ms|duration if t.finished_at else t.created_at|ago) }}</span>
+</a></li>
+{% endmacro %}
+
+{% macro approval_card(a, names, next_url='/app/ops') %}
+<div class="approval">
+  <div class="row-between"><span class="small"><b>{{ names.get(a.agent_id, a.agent_id) }}</b> vraagt goedkeuring</span><span class="who">{{ a.requested_at|ago }}</span></div>
+  <p>{{ a.summary }}</p>
+  <a class="small" href="/app/ops/tasks/{{ a.task_id }}">Taak bekijken {{ icon('arrow-right') }}</a>
+  <form method="post" action="/app/ops/approvals/{{ a.id }}" class="stack">
+    {{ ui.csrf_field() }}<input type="hidden" name="next_url" value="{{ next_url }}">
+    <label class="sr-only" for="n-{{ a.id }}">Toelichting</label>
+    <input id="n-{{ a.id }}" name="note" type="text" placeholder="Toelichting (verplicht bij afwijzen)">
+    <div class="actions"><button class="btn btn-sm btn-positive" name="decision" value="approve" type="submit">{{ icon('check') }}Goedkeuren</button><button class="btn btn-sm btn-danger" name="decision" value="reject" type="submit">Afwijzen</button></div>
+  </form>
+</div>
+{% endmacro %}
+
+{% macro score(v, threshold) %}<span class="score" data-tip="Fitscore {{ v }} van 100 (drempel {{ threshold }})" tabindex="0">{{ v }}<svg aria-hidden="true"><rect class="track" width="100%" height="6" rx="3"/><rect class="fill{{ ' good' if v >= threshold }}" width="{{ v }}%" height="6" rx="3"/></svg></span>{% endmacro %}

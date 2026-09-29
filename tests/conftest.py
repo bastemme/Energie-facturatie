@@ -17,6 +17,7 @@ def _settings(tmp_path, monkeypatch):
     monkeypatch.setenv("ER_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("ER_STORAGE_ENCRYPTION_KEY", Fernet.generate_key().decode())
     monkeypatch.setenv("ER_DATABASE_URL", TEST_DB_URL)
+    monkeypatch.setenv("ER_RESEARCH_PROVIDER", "mock")  # tests never touch the internet
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

@@ -176,6 +176,20 @@
     });
   }
 
+  /* ---------- live refresh (AI Operations): reload when the server state changes ---------- */
+  const live = $("[data-pulse]");
+  if (live && window.fetch) {
+    const url = live.dataset.pulse, start = live.dataset.pulseV;
+    let busy = false;
+    setInterval(() => {
+      if (busy || document.hidden || document.querySelector("dialog[open]") || document.activeElement?.matches("input, textarea, select")) return;
+      busy = true;
+      fetch(url, { headers: { Accept: "application/json" }, credentials: "same-origin" })
+        .then((r) => r.json()).then((d) => { if (d.v !== start) location.reload(); })
+        .catch(() => {}).finally(() => { busy = false; });
+    }, 3000);
+  }
+
   /* ---------- landing: invoice analysis demo ---------- */
   const demo = $(".demo");
   if (demo) {

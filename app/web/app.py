@@ -38,11 +38,20 @@ def _user_or_none(request: Request):
         return None
 
 
+def _sync_agents() -> None:
+    from app.agents.registry import sync_agents
+    from app.db import session_factory
+
+    with session_factory()() as db:
+        sync_agents(db)
+
+
 def create_app(database_url: str | None = None) -> FastAPI:
     settings = get_settings()
     configure_logging()
     init_engine(database_url)
     create_all()
+    _sync_agents()
 
     app = FastAPI(title="Energy Invoice Recovery", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(
@@ -94,8 +103,16 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
-    from app.web import routes_admin, routes_auth, routes_cases, routes_clients, routes_public, routes_review
+    from app.web import (
+        routes_admin,
+        routes_auth,
+        routes_cases,
+        routes_clients,
+        routes_ops,
+        routes_public,
+        routes_review,
+    )
 
-    for module in (routes_public, routes_auth, routes_clients, routes_review, routes_cases, routes_admin):
+    for module in (routes_public, routes_auth, routes_clients, routes_review, routes_cases, routes_admin, routes_ops):
         app.include_router(module.router)
     return app

@@ -4,6 +4,8 @@
     python -m app.cli create-admin EMAIL           # prompts for password
     python -m app.cli retention                    # erase clients whose retention period expired
     python -m app.cli seed-demo                    # SYNTHETIC demo client (clearly marked) for local testing
+    python -m app.cli agents run                   # process the agent task queue once
+    python -m app.cli agents worker                # keep processing the queue (separate worker process)
 """
 
 from __future__ import annotations
@@ -147,6 +149,29 @@ def cmd_demo(args) -> None:
     uvicorn.run(create_app(), host="127.0.0.1", port=args.port, log_level="warning")
 
 
+def cmd_agents(args) -> None:
+    import time
+
+    from app.agents.registry import sync_agents
+    from app.agents.runner import run_pending
+
+    init_engine()
+    create_all()
+    with session_scope() as db:
+        sync_agents(db)
+    if args.action == "run":
+        print(f"{run_pending(max_tasks=args.max)} taak/taken verwerkt.")
+        return
+    print(f"Agent-worker gestart; controleert de wachtrij elke {args.interval} s. Stoppen: Ctrl+C.")
+    try:
+        while True:
+            if done := run_pending(max_tasks=args.max):
+                print(f"{done} taak/taken verwerkt.")
+            time.sleep(args.interval)
+    except KeyboardInterrupt:
+        pass
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -162,6 +187,11 @@ def main(argv: list[str] | None = None) -> None:
     d.add_argument("--port", type=int, default=8000)
     d.add_argument("--no-browser", action="store_true")
     d.set_defaults(func=cmd_demo)
+    a = sub.add_parser("agents", help="process the agent task queue")
+    a.add_argument("action", choices=["run", "worker"])
+    a.add_argument("--max", type=int, default=25, help="max tasks per pass")
+    a.add_argument("--interval", type=float, default=5.0, help="seconds between passes (worker)")
+    a.set_defaults(func=cmd_agents)
     args = parser.parse_args(argv)
     args.func(args)
 
