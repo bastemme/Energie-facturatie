@@ -7,7 +7,14 @@ from openpyxl import Workbook
 from sqlalchemy import select
 
 from app.devtools.synthetic import SynLine, invoices_to_csv, render_invoice_pdf, render_scanned_like_pdf
-from app.domain.enums import DocumentStatus, DocumentType, ExtractionMethod, InvoiceType, LineCategory, ReadingType
+from app.domain.enums import (
+    DocumentStatus,
+    DocumentType,
+    ExtractionMethod,
+    InvoiceType,
+    LineCategory,
+    ReadingType,
+)
 from app.ingestion.pipeline import DuplicateDocument, ingest_upload
 from app.ingestion.storage import get_store
 from app.ingestion.validation import UploadRejected, safe_filename

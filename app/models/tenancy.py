@@ -33,6 +33,10 @@ class Client(IdMixin, TimestampMixin, Base):
     consent_given_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     consent_given_by: Mapped[str | None] = mapped_column(String(200))
 
+    # Recoveries are computed excl. VAT. If the client deducts VAT (voorbelasting), VAT overcharges
+    # have no net financial effect and are reported with potential recovery 0.
+    vat_deductible: Mapped[bool] = mapped_column(Boolean, default=True)
+
     # Privacy
     ai_processing_allowed: Mapped[bool] = mapped_column(Boolean, default=False)
     retention_days: Mapped[int] = mapped_column(Integer, default=365)

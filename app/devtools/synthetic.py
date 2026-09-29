@@ -47,7 +47,8 @@ class SynInvoice:
     customer: str = "Synthetisch Testbedrijf B.V."
     meter_number: str = "E0012345678"
     vat_rate: Decimal = Decimal("21")
-    readings: list[tuple[str, str, date, Decimal, str]] = field(default_factory=list)  # (begin/eind, reg, date, value, type)
+    # (begin/eind, register, date, value, type)
+    readings: list[tuple[str, str, date, Decimal, str]] = field(default_factory=list)
     credit_note: bool = False
     corrects: str | None = None
     subtotal_override: Decimal | None = None

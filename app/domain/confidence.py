@@ -6,8 +6,8 @@ from app.domain.enums import Confidence
 
 
 class EvidenceQuality(StrEnum):
-    EXPLICIT = "EXPLICIT"  # value printed on a verified document / verified reference row
-    EXTRACTED = "EXTRACTED"  # value extracted from a document but not yet human-verified
+    EXPLICIT = "EXPLICIT"  # verified document value, structured export, or verified reference/contract row
+    EXTRACTED = "EXTRACTED"  # value parsed from a PDF but not yet human-verified
     DERIVED = "DERIVED"  # computed via normalization/inference (category mapping, prorating)
     ESTIMATED = "ESTIMATED"  # based on estimated readings
     STATISTICAL = "STATISTICAL"  # comparison with history / patterns
@@ -15,7 +15,7 @@ class EvidenceQuality(StrEnum):
 
 _QUALITY_CAP = {
     EvidenceQuality.EXPLICIT: Confidence.HIGH,
-    EvidenceQuality.EXTRACTED: Confidence.HIGH,
+    EvidenceQuality.EXTRACTED: Confidence.MEDIUM,  # HIGH requires human-verified or structured evidence
     EvidenceQuality.DERIVED: Confidence.MEDIUM,
     EvidenceQuality.ESTIMATED: Confidence.LOW,
     EvidenceQuality.STATISTICAL: Confidence.LOW,

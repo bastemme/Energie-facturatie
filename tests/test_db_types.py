@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 import pytest
+from sqlalchemy.exc import StatementError
 
 from app.models import Client
 
@@ -19,5 +20,5 @@ def test_decimal_exact_roundtrip(db):
 
 def test_float_rejected(db):
     db.add(Client(company_name="X", success_fee_percentage=0.15))
-    with pytest.raises(Exception):
+    with pytest.raises(StatementError):
         db.commit()

@@ -38,13 +38,17 @@ RE_INVOICE_NUMBER = re.compile(
     r"creditnotanummer|invoice\s*(?:number|no\.?))\s*[:#]?\s*([A-Z0-9][A-Z0-9\-/.]{2,40})",
     re.I,
 )
-RE_INVOICE_DATE = re.compile(rf"(?:factuurdatum|datum\s+factuur|notadatum|invoice\s+date|datum)\s*:?\s*({_D})", re.I)
+RE_INVOICE_DATE = re.compile(
+    rf"(?:factuurdatum|datum\s+factuur|notadatum|invoice\s+date|datum)\s*:?\s*({_D})", re.I
+)
 RE_PERIOD = re.compile(
     rf"(?:periode|factuurperiode|leveringsperiode|verbruiksperiode|afrekenperiode|afrekeningsperiode)\s*:?\s*"
     rf"({_D})\s*(?:t/m|tm|tot\s+en\s+met|-|–|tot)\s*({_D})",
     re.I,
 )
-RE_EAN_LABELED = re.compile(r"(?:ean(?:[-\s]?code)?|aansluit(?:ings)?nummer|aansluiting)\s*:?\s*(\d[\d ]{16,24}\d)", re.I)
+RE_EAN_LABELED = re.compile(
+    r"(?:ean(?:[-\s]?code)?|aansluit(?:ings)?nummer|aansluiting)\s*:?\s*(\d[\d ]{16,24}\d)", re.I
+)
 RE_EAN_BARE = re.compile(r"\b(87\d{16})\b")
 RE_METER = re.compile(r"meter\s*(?:nummer|nr\.?)\s*:?\s*([A-Z0-9][A-Z0-9\-]{3,29})", re.I)
 RE_SUPPLIER_LABEL = re.compile(r"(?:leverancier|energieleverancier)\s*:?\s*([A-Za-z][\w .&-]{2,60})", re.I)
