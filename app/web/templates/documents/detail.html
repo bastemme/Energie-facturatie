@@ -1,0 +1,42 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import csrf_field, verified with context %}
+{% block title %}{{ doc.original_filename }}{% endblock %}
+{% block content %}
+<p class="small"><a href="/app/clients/{{ client.id }}#documenten">← {{ client.company_name }}</a></p>
+<h1>{{ doc.original_filename }}</h1>
+<div class="card"><dl class="meta">
+  <dt>Soort</dt><dd>{{ doc.doc_type.value }}{% if doc.doc_type_confidence %} ({{ doc.doc_type_confidence|pct }}){% endif %}</dd>
+  <dt>Status</dt><dd>{{ doc.status.value }}</dd>
+  <dt>Pagina's</dt><dd>{{ doc.page_count or '—' }}</dd>
+  <dt>Extractiezekerheid</dt><dd>{{ doc.extraction_confidence|pct if doc.extraction_confidence is not none else '—' }}</dd>
+  <dt>SHA-256</dt><dd class="mono">{{ doc.sha256 }}</dd>
+  <dt>Geüpload</dt><dd>{{ doc.created_at|d }}</dd>
+</dl>
+{% if doc.processing_error %}<div class="flash error mt">{{ doc.processing_error }}</div>{% endif %}
+{% if doc.processing_notes %}<div class="notice"><strong>Validatie-opmerkingen</strong><ul>{% for n in doc.processing_notes %}<li>{{ n }}</li>{% endfor %}</ul></div>{% endif %}
+{% if doc.status.value == 'NEEDS_OCR' %}<div class="notice">Dit document heeft geen tekstlaag. Voer de factuurgegevens handmatig in; de waarden worden dan als handmatige invoer vastgelegd.</div>{% endif %}
+<div class="actions mt">
+  <a class="btn secondary" href="/app/documents/{{ doc.id }}/download">Download origineel</a>
+  {% if doc.mime_type == 'application/pdf' %}<a class="btn secondary" href="/app/documents/{{ doc.id }}/view/1">Bekijk pagina 1</a>{% endif %}
+  {% if user.is_staff %}
+  <a class="btn secondary" href="/app/invoices/new?client_id={{ doc.client_id }}&document_id={{ doc.id }}">Factuur handmatig invoeren</a>
+  <form method="post" action="/app/documents/{{ doc.id }}/reprocess" class="inline">{{ csrf_field() }}
+    <select name="declared_type"><option value="">Automatisch</option><option value="INVOICE">Factuur</option><option value="CREDIT_NOTE">Creditnota</option><option value="CONTRACT">Contract</option><option value="OTHER">Overig</option></select>
+    <button class="btn secondary" type="submit">Opnieuw verwerken</button></form>
+  {% endif %}
+</div></div>
+{% if invoices %}
+<h2>Uitgelezen facturen</h2>
+<div class="table-wrap"><table>
+  <tr><th>Nummer</th><th>Periode</th><th class="num">Regels</th><th class="num">Totaal</th><th class="num">Zekerheid</th><th>Status</th></tr>
+  {% for i in invoices %}<tr><td><a href="/app/invoices/{{ i.id }}">{{ i.label }}</a></td><td>{{ i.period or '—' }}</td><td class="num">{{ i.lines|length }}</td><td class="num">{{ i.total_incl_vat|eur }}</td><td class="num">{{ i.extraction_confidence|pct if i.extraction_confidence is not none else '—' }}</td><td>{{ verified(i.is_verified) }}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+{% if readings %}
+<h2>Meterstanden</h2>
+<div class="table-wrap"><table>
+  <tr><th>EAN</th><th>Register</th><th>Datum</th><th class="num">Stand</th><th>Type</th><th class="num">Factor</th><th>Bron</th></tr>
+  {% for r in readings %}<tr><td class="mono">{{ r.ean or '—' }}</td><td>{{ r.register }}</td><td>{{ r.reading_date|d }}</td><td class="num">{{ r.reading|nl }} {{ r.unit }}</td><td>{{ r.reading_type.value }}</td><td class="num">{{ r.multiplier|nl }}</td><td>{% if r.source_page %}p. {{ r.source_page }}{% elif r.source_row %}rij {{ r.source_row }}{% endif %}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+{% endblock %}

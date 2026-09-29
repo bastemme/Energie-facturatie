@@ -1,0 +1,41 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+{% block title %}Nieuwe klant{% endblock %}
+{% block content %}
+<h1>Nieuwe klant — intake</h1>
+{% for e in errors or [] %}<div class="flash error">{{ e }}</div>{% endfor %}
+{% set f = form or {} %}
+<form method="post" action="/app/clients/new" class="card">
+  {{ csrf_field() }}
+  {% if lead %}<input type="hidden" name="lead_id" value="{{ lead.id }}"><p class="notice info">Gegevens overgenomen uit lead van {{ lead.created_at|d }}.</p>{% endif %}
+  <h2>Bedrijf</h2>
+  <div class="form-row">
+    <div><label for="company_name">Bedrijfsnaam *</label><input id="company_name" name="company_name" type="text" required value="{{ f.get('company_name') or (lead.company_name if lead else '') }}"></div>
+    <div><label for="kvk_number">KvK-nummer</label><input id="kvk_number" name="kvk_number" type="text" value="{{ f.get('kvk_number') or (lead.kvk_number if lead and lead.kvk_number else '') }}"></div>
+    <div><label for="number_of_locations">Aantal locaties</label><input id="number_of_locations" name="number_of_locations" type="number" min="1" value="{{ f.get('number_of_locations') or (lead.number_of_locations if lead and lead.number_of_locations else '') }}"></div>
+  </div>
+  <div class="form-row">
+    <div><label for="contact_name">Contactpersoon</label><input id="contact_name" name="contact_name" type="text" value="{{ f.get('contact_name') or (lead.contact_name if lead else '') }}"></div>
+    <div><label for="contact_email">E-mail</label><input id="contact_email" name="contact_email" type="email" value="{{ f.get('contact_email') or (lead.email if lead else '') }}"></div>
+    <div><label for="contact_phone">Telefoon</label><input id="contact_phone" name="contact_phone" type="text" value="{{ f.get('contact_phone') or (lead.phone if lead and lead.phone else '') }}"></div>
+  </div>
+  <h2>Energie</h2>
+  <div class="form-row">
+    <div><label for="approx_annual_energy_spend">Energiekosten per jaar (circa, €)</label><input id="approx_annual_energy_spend" name="approx_annual_energy_spend" type="text" value="{{ f.get('approx_annual_energy_spend') or (lead.approx_annual_energy_spend if lead and lead.approx_annual_energy_spend else '') }}"></div>
+    <div><label for="suppliers">Energieleverancier(s)</label><input id="suppliers" name="suppliers" type="text" value="{{ f.get('suppliers', '') }}"></div>
+    <div><label for="invoice_period_description">Factuurperiode (bijv. 2023–2025)</label><input id="invoice_period_description" name="invoice_period_description" type="text" value="{{ f.get('invoice_period_description', '') }}"></div>
+  </div>
+  <label for="contract_information">Contractinformatie (indien bekend)</label><textarea id="contract_information" name="contract_information">{{ f.get('contract_information', '') }}</textarea>
+  <h2>Afspraken</h2>
+  <div class="form-row">
+    <div><label for="success_fee_percentage">Succesvergoeding (%) *</label><input id="success_fee_percentage" name="success_fee_percentage" type="text" required value="{{ f.get('success_fee_percentage') or (default_fee if default_fee is not none else '') }}"><span class="small muted">Percentage van het daadwerkelijk teruggevorderde bedrag, zoals overeengekomen.</span></div>
+    <div><label for="retention_days">Bewaartermijn na einde opdracht (dagen)</label><input id="retention_days" name="retention_days" type="number" min="30" value="{{ f.get('retention_days') or default_retention or 365 }}"></div>
+  </div>
+  <label class="checkbox"><input type="checkbox" name="vat_deductible" checked> <span>Klant verrekent btw (voorbelasting). Btw-verschillen tellen dan niet als terugvorderbaar bedrag.</span></label>
+  <label class="checkbox"><input type="checkbox" name="ai_processing_allowed"> <span>Klant staat verwerking door externe AI-diensten toe (alleen aanvinken als dit in de verwerkersovereenkomst is vastgelegd).</span></label>
+  <h2>Machtiging</h2>
+  <label class="checkbox"><input type="checkbox" name="consent_given" required> <span>De klant heeft schriftelijk opdracht en machtiging gegeven om facturen te controleren en namens de klant correctieverzoeken in te dienen (versie {{ consent_version }}).</span></label>
+  <label for="consent_given_by">Getekend door (naam, functie)</label><input id="consent_given_by" name="consent_given_by" type="text" value="{{ f.get('consent_given_by', '') }}">
+  <div class="actions mt"><button class="btn" type="submit">Klant aanmaken</button><a class="btn secondary" href="/app/clients">Annuleren</a></div>
+</form>
+{% endblock %}

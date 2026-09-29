@@ -79,7 +79,7 @@ def render_page_png(content: bytes, page: int, highlights: list[list[float]] | N
         img = p.to_image(resolution=resolution)
         for bbox in highlights or []:
             x0, top, x1, bottom = bbox
-            img.draw_rect((x0 - 2, top - 2, x1 + 2, bottom + 2), fill=(255, 200, 0, 60),
+            img.draw_rect((x0 - 3, top - 3, x1 + 8, bottom + 3), fill=(255, 200, 0, 60),
                           stroke=(220, 30, 30), stroke_width=2)
         buf = io.BytesIO()
         img.save(buf, format="PNG")

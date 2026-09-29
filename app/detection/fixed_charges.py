@@ -16,12 +16,16 @@ from app.detection.base import (
 )
 from app.domain.confidence import EvidenceQuality, confidence_from_evidence
 from app.domain.enums import Classification
-from app.domain.money import format_decimal_nl, round_cents
+from app.domain.money import format_decimal_nl, format_price, round_cents
 from app.domain.periods import months_between
 from app.domain.units import normalize_unit
 
 RULE = "fixed_charge_period"
-MONTH_TOLERANCE = Decimal("0.05")
+# Suppliers bill "1 maand" for anniversary periods (e.g. 15-01 t/m 14-02) and for months of 28–31 days.
+# Only flag clear over-billing: more than 10% (and at least 0.1 month / 1 day) above the period length.
+MIN_MONTH_TOLERANCE = Decimal("0.1")
+MIN_DAY_TOLERANCE = Decimal("1")
+RELATIVE_TOLERANCE = Decimal("0.10")
 
 
 def detect_fixed_charge_quantity(ctx: AnalysisContext) -> list[Finding]:
@@ -35,9 +39,10 @@ def detect_fixed_charge_quantity(ctx: AnalysisContext) -> list[Finding]:
             if period is None or unit not in ("month", "day"):
                 continue
             expected_qty = months_between(period) if unit == "month" else Decimal(period.days)
-            tolerance = MONTH_TOLERANCE if unit == "month" else Decimal("0.5")
+            tolerance = max(MIN_MONTH_TOLERANCE if unit == "month" else MIN_DAY_TOLERANCE,
+                            expected_qty * RELATIVE_TOLERANCE)
             excess = line.quantity - expected_qty
-            if abs(excess) <= tolerance:
+            if excess <= tolerance:  # under-billing of fixed charges is not a recovery
                 continue
             expected_amount = round_cents(expected_qty * line.unit_price)
             diff = (line.amount or round_cents(line.quantity * line.unit_price)) - expected_amount
@@ -62,7 +67,7 @@ def detect_fixed_charge_quantity(ctx: AnalysisContext) -> list[Finding]:
                 calculation=[
                     f"Periode {period}: {format_decimal_nl(expected_qty.quantize(Decimal('0.0001')))} {unit_nl}",
                     f"Verwacht: {format_decimal_nl(expected_qty.quantize(Decimal('0.0001')))} × € "
-                    f"{format_decimal_nl(line.unit_price)} = {eur(expected_amount)}",
+                    f"{format_price(line.unit_price)} = {eur(expected_amount)}",
                     f"Gefactureerd: {eur(line.amount)}", f"Verschil: {eur(diff)}",
                 ],
                 evidence=[line_evidence(line)],

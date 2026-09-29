@@ -1,0 +1,22 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import conf, cls, rstatus with context %}
+{% block title %}Beoordelen{% endblock %}
+{% block content %}
+<h1>Beoordelingswachtrij</h1>
+<form method="get" action="/app/review" class="card"><div class="form-row">
+  <div><label>Klant</label><select name="client_id"><option value="">Alle</option>{% for c in clients.values() %}<option value="{{ c.id }}" {% if filters.client_id == c.id %}selected{% endif %}>{{ c.company_name }}</option>{% endfor %}</select></div>
+  <div><label>Status</label><select name="status"><option value="">Openstaand</option>{% for s in ReviewStatus %}<option value="{{ s.value }}" {% if filters.status == s.value %}selected{% endif %}>{{ REVIEW_LABELS[s] }}</option>{% endfor %}</select></div>
+  <div><label>Zekerheid</label><select name="confidence"><option value="">Alle</option>{% for c in ['HIGH','MEDIUM','LOW'] %}<option {% if filters.confidence == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
+  <div><label>Type</label><select name="classification"><option value="">Alle</option><option value="POTENTIAL_ERROR" {% if filters.classification == 'POTENTIAL_ERROR' %}selected{% endif %}>Mogelijke fout</option><option value="ANOMALY" {% if filters.classification == 'ANOMALY' %}selected{% endif %}>Afwijking</option></select></div>
+  <div><label>Regel</label><select name="rule"><option value="">Alle</option>{% for r in rules %}<option {% if filters.rule == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></div>
+</div><div class="actions mt"><button class="btn secondary" type="submit">Filteren</button></div></form>
+<p class="muted">{{ items|length }} bevindingen · mogelijke waarde (niet dubbel geteld): <strong>{{ total|eur }}</strong></p>
+<div class="table-wrap"><table>
+  <tr><th>Klant</th><th>Factuur</th><th>Bevinding</th><th>Type</th><th>Zekerheid</th><th>Status</th><th class="num">Mogelijk</th></tr>
+  {% for a in items %}
+  <tr><td>{{ clients[a.client_id].company_name if a.client_id in clients else '' }}</td><td>{{ a.invoice.label if a.invoice else '—' }}</td>
+    <td><a href="/app/anomalies/{{ a.id }}">{{ a.title }}</a><br><span class="small muted">{{ a.rule_id }} v{{ a.rule_version }}</span></td>
+    <td>{{ cls(a.classification) }}</td><td>{{ conf(a.confidence) }}</td><td>{{ rstatus(a.review_status) }}</td><td class="num">{{ a.potential_recovery|eur }}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">Geen bevindingen voor deze selectie.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

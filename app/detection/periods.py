@@ -50,6 +50,8 @@ def detect_overlaps(ctx: AnalysisContext) -> list[Finding]:
                     break
                 overlap = a.period.overlap(b.period)
                 if overlap is None or _is_exact_duplicate(a, b):
+                    continue
+                if overlap.days <= ctx.settings.period_boundary_tolerance_days:
                     continue  # exact duplicates are reported by the duplicate detector
                 later = b
                 fixed = [li for li in later.lines if li.category.is_fixed_charge and li.amount is not None]
@@ -98,7 +100,7 @@ def detect_gaps(ctx: AnalysisContext) -> list[Finding]:
         for inv in invs:
             if prev is not None and covered_until is not None:
                 gap = Period(prev.billing_period_start, covered_until).gap_to(inv.period)
-                if gap is not None:
+                if gap is not None and gap.days > ctx.settings.period_boundary_tolerance_days:
                     findings.append(Finding(
                         rule_id=GAP_RULE, rule_version="1.0", category="period",
                         classification=Classification.ANOMALY,

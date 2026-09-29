@@ -26,7 +26,7 @@ from app.detection.base import (
 )
 from app.domain.confidence import EvidenceQuality, confidence_from_evidence
 from app.domain.enums import Classification, Confidence, LineCategory, RateKind
-from app.domain.money import ZERO, format_decimal_nl, round_cents
+from app.domain.money import ZERO, format_decimal_nl, format_price, round_cents
 from app.domain.periods import Period
 from app.domain.units import convert_quantity
 from app.models import ReferenceRate
@@ -65,8 +65,8 @@ def expected_tax(quantity: Decimal, period: Period, brackets: list[ReferenceRate
                      f"{format_decimal_nl(b.bracket_to) if b.bracket_to is not None else '∞'} (prorata grens "
                      f"{format_decimal_nl(low.quantize(Decimal('0.01')))}–"
                      f"{format_decimal_nl(high.quantize(Decimal('0.01'))) if high is not None else '∞'}): "
-                     f"{format_decimal_nl(qty.quantize(Decimal('0.0001')))} × € {format_decimal_nl(b.rate)} = "
-                     f"€ {format_decimal_nl(part.quantize(Decimal('0.0001')))}")
+                     f"{format_decimal_nl(qty.quantize(Decimal('0.0001')))} × € {format_price(b.rate)} = "
+                     f"€ {format_price(part.quantize(Decimal('0.0001')))}")
     if remaining > 0:
         return None
     return round_cents(total), steps

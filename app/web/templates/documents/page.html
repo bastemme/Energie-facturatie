@@ -1,0 +1,12 @@
+{% extends "app_base.html" %}
+{% block title %}Factuurpagina{% endblock %}
+{% block content %}
+<p class="small"><a href="/app/documents/{{ doc.id }}">← {{ doc.original_filename }}</a></p>
+<h1>{{ doc.original_filename }} — pagina {{ page }}</h1>
+{% if label %}<p class="notice info">Gemarkeerd: {{ label }}</p>{% endif %}
+<div class="actions mb">
+  {% if page > 1 %}<a class="btn small secondary" href="/app/documents/{{ doc.id }}/view/{{ page - 1 }}">← Vorige</a>{% endif %}
+  {% if not doc.page_count or page < doc.page_count %}<a class="btn small secondary" href="/app/documents/{{ doc.id }}/view/{{ page + 1 }}">Volgende →</a>{% endif %}
+</div>
+<img class="page-image" src="/app/documents/{{ doc.id }}/page/{{ page }}.png{% if hl %}?hl={{ hl }}{% endif %}" alt="Pagina {{ page }} van {{ doc.original_filename }}">
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import csrf_field, verified with context %}
+{% block title %}Contract {{ c.supplier }}{% endblock %}
+{% block content %}
+<p class="small"><a href="/app/clients/{{ client.id }}#contracten">← {{ client.company_name }}</a></p>
+<div class="actions"><h1>Contract {{ c.supplier }} {{ c.contract_reference or '' }}</h1> {{ verified(c.verified_at) }}</div>
+<div class="card"><dl class="meta">
+  <dt>Product</dt><dd>{{ c.commodity.value }}</dd><dt>Looptijd</dt><dd>{{ c.start_date|d }} – {{ c.end_date|d }}</dd>
+  <dt>EAN</dt><dd>{{ c.ean or 'alle aansluitingen bij deze leverancier' }}</dd>
+  <dt>Brondocument</dt><dd>{% if c.document_id %}<a href="/app/documents/{{ c.document_id }}">bekijken</a>{% else %}—{% endif %}</dd>
+  <dt>Indexatie</dt><dd>{{ c.indexation or '—' }}</dd><dt>Voorwaarden</dt><dd>{{ c.relevant_conditions or '—' }}</dd>
+</dl></div>
+<p class="notice info">Leg elke overeengekomen prijs vast als aparte regel met geldigheidsperiode. Indexaties en prijswijzigingen worden als nieuwe regels met een nieuwe ingangsdatum ingevoerd. Prijzen excl. btw en excl. energiebelasting.</p>
+<div class="table-wrap"><table>
+  <tr><th>Categorie</th><th class="num">Prijs</th><th>Eenheid</th><th>Geldig</th><th>Bron</th>{% if user.is_staff %}<th></th>{% endif %}</tr>
+  {% for p in c.prices %}<tr><td>{{ p.category.value }}</td><td class="num">€ {{ p.price|nl }}</td><td>{{ p.unit }}</td><td>{{ p.valid_from|d }} – {{ p.valid_to|d }}</td><td class="small">{% if p.source_page %}p. {{ p.source_page }}{% endif %} {{ p.source_text or '' }}</td>
+  {% if user.is_staff %}<td><form method="post" action="/app/contracts/{{ c.id }}/prices/{{ p.id }}/delete" class="inline">{{ csrf_field() }}<button class="btn small secondary" type="submit">Verwijderen</button></form></td>{% endif %}</tr>
+  {% else %}<tr><td colspan="6" class="muted">Nog geen prijzen.</td></tr>{% endfor %}
+</table></div>
+{% if user.is_staff %}
+<form method="post" action="/app/contracts/{{ c.id }}/prices" class="card mt">{{ csrf_field() }}
+  <h3>Prijs toevoegen</h3>
+  <div class="form-row">
+    <div><label>Categorie</label><select name="category">{% for cat in categories %}<option value="{{ cat.value }}">{{ cat.value }}</option>{% endfor %}</select></div>
+    <div><label>Prijs (€)</label><input name="price" type="text" required placeholder="0,18450"></div>
+    <div><label>Per eenheid</label><select name="unit"><option>kWh</option><option>MWh</option><option>m3</option><option value="month">maand</option><option value="day">dag</option><option value="year">jaar</option></select></div>
+  </div>
+  <div class="form-row">
+    <div><label>Geldig vanaf</label><input name="valid_from" type="date" required></div>
+    <div><label>Geldig t/m</label><input name="valid_to" type="date"></div>
+    <div><label>Pagina in contract</label><input name="source_page" type="number" min="1"></div>
+    <div><label>Citaat uit contract</label><input name="source_text" type="text"></div>
+  </div>
+  <div class="actions mt"><button class="btn" type="submit">Toevoegen</button></div>
+</form>
+<form method="post" action="/app/contracts/{{ c.id }}/verify" class="card">{{ csrf_field() }}
+  <p>Ik heb alle prijsregels gecontroleerd tegen het ondertekende contract.</p><button class="btn secondary" type="submit">Markeer als geverifieerd</button></form>
+{% endif %}
+{% endblock %}

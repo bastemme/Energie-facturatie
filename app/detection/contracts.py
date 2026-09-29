@@ -18,7 +18,7 @@ from app.detection.base import (
 )
 from app.domain.confidence import EvidenceQuality, confidence_from_evidence
 from app.domain.enums import Classification, Commodity, LineCategory
-from app.domain.money import ZERO, format_decimal_nl, round_cents
+from app.domain.money import ZERO, format_decimal_nl, format_price, round_cents
 from app.domain.periods import Period, months_between
 from app.domain.units import convert_quantity, normalize_unit
 from app.models import Contract, ContractPrice, Invoice, InvoiceLine
@@ -94,7 +94,7 @@ def expected_for_line(line: InvoiceLine, prices: list[ContractPrice], period: Pe
                 derived = True
             part = qty * p.price
             steps.append(f"{seg}: {format_decimal_nl(qty.quantize(Decimal('0.0001')))} {p_unit} × "
-                         f"€ {format_decimal_nl(p.price)} = € {format_decimal_nl(part.quantize(Decimal('0.0001')))}")
+                         f"€ {format_price(p.price)} = € {format_price(part.quantize(Decimal('0.0001')))}")
         else:
             if line.quantity is None:
                 return None
@@ -105,7 +105,7 @@ def expected_for_line(line: InvoiceLine, prices: list[ContractPrice], period: Pe
             part = qty * p.price
             share_txt = "" if share == 1 else f" (aandeel {seg.days}/{period.days} dagen)"
             steps.append(f"{seg}: {format_decimal_nl(qty.quantize(Decimal('0.0001')))} {p_unit}{share_txt} × "
-                         f"€ {format_decimal_nl(p.price)} = € {format_decimal_nl(part.quantize(Decimal('0.0001')))}")
+                         f"€ {format_price(p.price)} = € {format_price(part.quantize(Decimal('0.0001')))}")
         total += part
     return round_cents(total), steps, relevant, derived
 
@@ -148,9 +148,9 @@ def detect_contract_prices(ctx: AnalysisContext) -> list[Finding]:
                 if derived:
                     qualities.append(EvidenceQuality.DERIVED)
                 conf = confidence_from_evidence(qualities, extraction_confidence=line.confidence)
-                price_txt = ", ".join(f"€ {format_decimal_nl(p.price)}/{p.unit}" for p in used)
+                price_txt = ", ".join(f"€ {format_price(p.price)}/{p.unit}" for p in used)
                 invoiced_txt = (f"{format_decimal_nl(line.quantity)} {line.unit or ''} × € "
-                                f"{format_decimal_nl(line.unit_price)} = " if line.unit_price is not None
+                                f"{format_price(line.unit_price)} = " if line.unit_price is not None
                                 and line.quantity is not None else "")
                 findings.append(Finding(
                     rule_id=PRICE_RULE, rule_version="1.0",

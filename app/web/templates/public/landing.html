@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+{% block title %}Betaalt uw bedrijf te veel voor energie? · {{ operator_name }}{% endblock %}
+{% block body %}
+<section class="hero"><div class="container">
+  <h1>Betaalt uw bedrijf te veel voor energie?</h1>
+  <p class="lead">Wij controleren uw zakelijke energiefacturen op fouten en gemiste correcties. Geen resultaat? Geen factuur.</p>
+  <div class="actions mt">
+    <a class="btn large" href="#aanvraag">Laat mijn energiefacturen controleren</a>
+    <a class="btn large secondary" href="#hoe-het-werkt">Bekijk hoe het werkt</a>
+  </div>
+</div></section>
+
+<section class="section alt"><div class="container narrow">
+  <h2>Het probleem</h2>
+  <p>Een zakelijke energiefactuur combineert leveringstarieven, netbeheerkosten, vaste vergoedingen, energiebelasting en btw — vaak per aansluiting, per periode en met tussentijdse correcties. Daarbij gaat soms iets mis: een verkeerd tarief na een contractwijziging, een geschatte meterstand die nooit is rechtgezet, een periode die twee keer wordt gefactureerd, of een creditnota die niet volledig aansluit.</p>
+  <p>Zulke afwijkingen zijn in een stapel facturen lastig te zien. Wij leggen uw facturen systematisch naast elkaar, naast uw contract en naast uw meterstanden.</p>
+</div></section>
+
+<section class="section" id="hoe-het-werkt"><div class="container">
+  <h2>Hoe het werkt</h2>
+  <ol class="steps">
+    <li><strong>Aanleveren</strong><br>U levert uw energiefacturen (PDF of Excel-export) en, indien beschikbaar, uw energiecontract en meterstanden aan via een beveiligde omgeving.</li>
+    <li><strong>Controle</strong><br>Wij lezen de facturen uit en controleren elke regel met vaste rekenregels: tarieven, periodes, verbruik, vaste kosten, correcties en belastingen.</li>
+    <li><strong>Beoordeling</strong><br>Een specialist beoordeelt iedere mogelijke afwijking aan de hand van de brondocumenten. Alleen onderbouwde punten gaan door.</li>
+    <li><strong>Terugvordering</strong><br>Na uw akkoord dienen wij een onderbouwd verzoek tot correctie in bij de leverancier en volgen dit op tot afronding.</li>
+  </ol>
+</div></section>
+
+<section class="section alt" id="wat-we-controleren"><div class="container">
+  <h2>Wat we controleren</h2>
+  <ul class="checklist">
+    <li>Toegepaste tarieven tegenover uw contract, inclusief prijswijzigingen</li>
+    <li>Vaste leveringskosten en vergoedingen per periode</li>
+    <li>Gefactureerd verbruik tegenover meterstanden</li>
+    <li>Geschatte in plaats van werkelijke meterstanden</li>
+    <li>Begin- en eindstanden tussen opeenvolgende facturen</li>
+    <li>Overlappende of dubbel gefactureerde periodes</li>
+    <li>Dubbele facturen en dubbele factuurregels</li>
+    <li>Rekenfouten: hoeveelheid × tarief, subtotalen, totalen</li>
+    <li>Creditnota's en herfacturen: sluiten ze op elkaar aan?</li>
+    <li>Btw-berekening</li>
+    <li>Energiebelasting (met fiscale verificatie)</li>
+    <li>Ongebruikelijke verbruikspatronen per aansluiting</li>
+  </ul>
+</div></section>
+
+<section class="section"><div class="container narrow">
+  <h2>No cure, no pay</h2>
+  <p>U betaalt alleen een vooraf afgesproken percentage van het bedrag dat daadwerkelijk door de leverancier wordt gecrediteerd of terugbetaald. Levert de controle niets op, dan betaalt u niets.</p>
+  <p class="muted">Wij rekenen niet over geschatte of mogelijke besparingen — alleen over geld dat aantoonbaar is teruggekomen.</p>
+</div></section>
+
+<section class="section alt"><div class="container narrow">
+  <h2>Rekenvoorbeeld</h2>
+  <p class="muted small">Fictief voorbeeld ter illustratie van onze werkwijze. Geen resultaat van een bestaande klant.</p>
+  <p>Op een factuur is 1.000 kWh normaaltarief gefactureerd tegen € 0,25 per kWh. In het leveringscontract is voor die periode € 0,20 per kWh afgesproken.</p>
+  <div class="table-wrap"><table class="example-table">
+    <tr><th>Onderdeel</th><th>Bedrag</th></tr>
+    <tr><td>Gefactureerd: 1.000 kWh × € 0,25</td><td>€ 250,00</td></tr>
+    <tr><td>Volgens contract: 1.000 kWh × € 0,20</td><td>€ 200,00</td></tr>
+    <tr><td><strong>Mogelijke discrepantie</strong> (verificatie vereist)</td><td><strong>€ 50,00</strong></td></tr>
+  </table></div>
+  <p class="mt">Na verificatie door een specialist en uw akkoord vragen wij de leverancier om correctie. Pas wanneer het bedrag daadwerkelijk is gecrediteerd, geldt het als teruggevorderd — en pas dan brengen wij onze vergoeding in rekening.</p>
+</div></section>
+
+<section class="section"><div class="container narrow">
+  <h2>Beveiliging en privacy</h2>
+  <ul>
+    <li>Documenten worden versleuteld opgeslagen en zijn alleen toegankelijk voor geautoriseerde medewerkers en uzelf.</li>
+    <li>Alle inzage, downloads en beslissingen worden vastgelegd in een auditlog.</li>
+    <li>Wij gebruiken uw gegevens uitsluitend voor de controle en terugvordering.</li>
+    <li>Na afloop van de opdracht worden uw gegevens volgens de afgesproken bewaartermijn verwijderd; u kunt ook eerder om verwijdering vragen.</li>
+    <li>Uw facturen worden niet zonder uw uitdrukkelijke toestemming met externe AI-diensten gedeeld.</li>
+  </ul>
+  <p><a href="/privacy">Meer over privacy en beveiliging</a></p>
+</div></section>
+
+<section class="section alt faq" id="faq"><div class="container narrow">
+  <h2>Veelgestelde vragen</h2>
+  <details><summary>Welke facturen heeft u nodig?</summary><p>Bij voorkeur alle energiefacturen (elektriciteit en gas) van de afgelopen jaren, inclusief jaarafrekeningen en creditnota's. Een Excel-export uit het klantportaal van uw leverancier is ideaal; PDF's werken ook.</p></details>
+  <details><summary>Hoe ver terug kan er worden teruggevorderd?</summary><p>Dat hangt af van de situatie, de leveringsvoorwaarden en de toepasselijke verjaringstermijnen. Wij beoordelen dit per geval en doen daar vooraf geen algemene toezeggingen over.</p></details>
+  <details><summary>Vindt u gegarandeerd iets?</summary><p>Nee. Veel facturen zijn correct. Wij melden alleen afwijkingen die we met brondocumenten kunnen onderbouwen, en wij onderscheiden duidelijk tussen een mogelijke afwijking en een bevestigde fout.</p></details>
+  <details><summary>Wat kost het?</summary><p>Alleen een vooraf afgesproken percentage van het daadwerkelijk teruggevorderde bedrag. Geen resultaat betekent geen kosten.</p></details>
+  <details><summary>Neemt u contact op met mijn leverancier?</summary><p>Alleen na uw akkoord en op basis van een door u getekende machtiging. U ziet vooraf welke punten wij indienen.</p></details>
+  <details><summary>Werkt dit ook voor meerdere vestigingen?</summary><p>Ja. Wij controleren per aansluiting (EAN), zodat ook bij veel locaties overzichtelijk blijft waar een afwijking zit.</p></details>
+</div></section>
+
+<section class="section" id="aanvraag"><div class="container narrow">
+  <h2>Laat uw energiefacturen controleren</h2>
+  <p>Laat uw gegevens achter; wij nemen binnen twee werkdagen contact met u op om de aanlevering te bespreken.</p>
+  {% if form_error %}<div class="flash error">{{ form_error }}</div>{% endif %}
+  <form method="post" action="/aanvraag" class="card">
+    {{ csrf_field() }}
+    <div class="form-row">
+      <div><label for="company_name">Bedrijfsnaam</label><input id="company_name" name="company_name" type="text" required maxlength="200"></div>
+      <div><label for="kvk_number">KvK-nummer</label><input id="kvk_number" name="kvk_number" type="text" inputmode="numeric" maxlength="12"></div>
+    </div>
+    <div class="form-row">
+      <div><label for="contact_name">Contactpersoon</label><input id="contact_name" name="contact_name" type="text" required maxlength="200"></div>
+      <div><label for="email">E-mailadres</label><input id="email" name="email" type="email" required maxlength="254"></div>
+      <div><label for="phone">Telefoon</label><input id="phone" name="phone" type="text" maxlength="50"></div>
+    </div>
+    <div class="form-row">
+      <div><label for="approx_annual_energy_spend">Energiekosten per jaar (circa, €)</label><input id="approx_annual_energy_spend" name="approx_annual_energy_spend" type="text" inputmode="decimal"></div>
+      <div><label for="number_of_locations">Aantal locaties</label><input id="number_of_locations" name="number_of_locations" type="number" min="1" max="10000"></div>
+    </div>
+    <label for="message">Toelichting (optioneel)</label><textarea id="message" name="message" maxlength="2000"></textarea>
+    <div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+    {% for k, v in (utm or {}).items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <label class="checkbox"><input type="checkbox" name="privacy_consent" required> <span>Ik ga akkoord met het verwerken van deze gegevens om contact met mij op te nemen (zie <a href="/privacy">privacy</a>).</span></label>
+    <div class="actions mt"><button class="btn large" type="submit">Laat mijn energiefacturen controleren</button></div>
+  </form>
+</div></section>
+{% endblock %}

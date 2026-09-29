@@ -519,3 +519,19 @@ def test_multiple_eans_do_not_mix(db, client):
     add_invoice(db, client, "E1", *JAN, [line(C.FIXED_SUPPLY_FEE, 1, "month", "7.50")])
     add_invoice(db, client, "E2", *JAN, [line(C.FIXED_SUPPLY_FEE, 1, "month", "7.50")], ean=EAN_2)
     assert findings(db, client, "billing_period_overlap") == []
+
+
+def test_fixed_charge_anniversary_period_not_flagged(db, client):
+    add_invoice(db, client, "AN", date(2026, 1, 15), date(2026, 2, 14), [line(C.FIXED_SUPPLY_FEE, 1, "month", "7.50")])
+    add_invoice(db, client, "FEB", date(2026, 2, 1), date(2026, 2, 28), [line(C.FIXED_SUPPLY_FEE, 1, "month", "7.50")],
+                ean=EAN_2)
+    assert findings(db, client, "fixed_charge_period") == []
+
+
+def test_one_day_boundary_differences_ignored(db, client):
+    # supplier uses exclusive end dates: 01-01 – 01-02, then 01-02 – 01-03 (1-day "overlap")
+    add_invoice(db, client, "X1", date(2026, 1, 1), date(2026, 2, 1), [line(C.FIXED_SUPPLY_FEE, 1, "month", "7.50")])
+    add_invoice(db, client, "X2", date(2026, 2, 1), date(2026, 3, 1), [line(C.FIXED_SUPPLY_FEE, 1, "month", "7.50")])
+    add_invoice(db, client, "X3", date(2026, 3, 3), date(2026, 3, 31), [line(C.FIXED_SUPPLY_FEE, 1, "month", "7.50")])
+    assert findings(db, client, "billing_period_overlap") == []
+    assert findings(db, client, "billing_period_gap") == []  # 1-day gap (02-03) tolerated

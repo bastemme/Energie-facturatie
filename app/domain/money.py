@@ -53,6 +53,14 @@ def format_eur(value: Decimal | None, *, signed: bool = False) -> str:
     return f"{sign}€ {'.'.join(groups)},{frac}"
 
 
+def format_price(value: Decimal | None) -> str:
+    """Tariffs/amounts with at least 2 decimals and no trailing-zero noise: 0,20 · 0,18450 · 200,00."""
+    if value is None:
+        return "—"
+    places = max(2, -value.normalize().as_tuple().exponent) if value.normalize().as_tuple().exponent < 0 else 2
+    return format_decimal_nl(value, places)
+
+
 def format_decimal_nl(value: Decimal | None, places: int | None = None) -> str:
     """Dutch decimal notation for quantities/tariffs, e.g. 1.234,5 or 0,12345."""
     if value is None:

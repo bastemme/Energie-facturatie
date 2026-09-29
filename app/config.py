@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     consumption_spike_ratio: Decimal = Decimal("2.0")
     consumption_drop_ratio: Decimal = Decimal("0.4")
     min_history_periods: int = 3
+    period_boundary_tolerance_days: int = 1
     extraction_review_threshold: float = 0.9
 
     # AI is OFF by default. Enabling globally still requires per-client consent.

@@ -1,0 +1,32 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import csrf_field, verified with context %}
+{% block title %}Referentietarieven{% endblock %}
+{% block content %}
+<h1>Referentietarieven</h1>
+<p class="notice">Wettelijke tarieven (btw, energiebelasting) zijn tijdsafhankelijk. Het systeem levert <strong>geen</strong> tarieven mee. Voer elk tarief in vanuit de officiële bron (bijv. Belastingdienst) met bronvermelding. Alleen geverifieerde tarieven worden in controles gebruikt; bevindingen vermelden welk tarief is gebruikt.</p>
+<div class="table-wrap"><table>
+  <tr><th>Soort</th><th>Schijf</th><th class="num">Tarief</th><th>Eenheid</th><th>Geldig</th><th>Bron</th><th>Status</th><th></th></tr>
+  {% for r in rates %}<tr><td>{{ r.kind.value }}</td><td>{{ r.bracket_from|nl if r.bracket_from is not none else '' }} – {{ r.bracket_to|nl if r.bracket_to is not none else '' }}</td><td class="num">{{ r.rate|nl }}</td><td>{{ r.unit }}</td><td>{{ r.valid_from|d }} – {{ r.valid_to|d }}</td><td class="small">{{ r.source_reference }}</td><td>{{ verified(r.verified_at) }}</td>
+  <td>{% if not r.verified_at and user.role.value == 'ADMIN' %}<form method="post" action="/app/reference-rates/{{ r.id }}/verify" class="inline">{{ csrf_field() }}<button class="btn small secondary" type="submit">Verifiëren</button></form>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="8" class="muted">Nog geen tarieven ingevoerd. Belastingcontroles worden overgeslagen.</td></tr>{% endfor %}
+</table></div>
+{% if user.role.value == 'ADMIN' %}
+<form method="post" action="/app/reference-rates" class="card mt">{{ csrf_field() }}
+  <h3>Tarief toevoegen</h3>
+  <div class="form-row">
+    <div><label>Soort</label><select name="kind">{% for k in kinds %}<option value="{{ k.value }}">{{ k.value }}</option>{% endfor %}</select></div>
+    <div><label>Tarief</label><input name="rate" type="text" required placeholder="bijv. 21 (btw %) of 0,12345 (€/kWh)"></div>
+    <div><label>Eenheid</label><select name="unit"><option value="percent">percent</option><option>kWh</option><option>m3</option></select></div>
+  </div>
+  <div class="form-row">
+    <div><label>Schijf vanaf (verbruik/jaar)</label><input name="bracket_from" type="text"></div>
+    <div><label>Schijf tot</label><input name="bracket_to" type="text"></div>
+    <div><label>Geldig vanaf</label><input name="valid_from" type="date" required></div>
+    <div><label>Geldig t/m</label><input name="valid_to" type="date"></div>
+  </div>
+  <label>Bron (URL of wetsartikel) *</label><input name="source_reference" type="text" required>
+  <label>Notities</label><input name="notes" type="text">
+  <div class="actions mt"><button class="btn" type="submit">Toevoegen</button></div>
+</form>
+{% endif %}
+{% endblock %}

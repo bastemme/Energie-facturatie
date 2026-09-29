@@ -1,0 +1,22 @@
+{% macro csrf_field() %}<input type="hidden" name="csrf_token" value="{{ csrf }}">{% endmacro %}
+{% macro conf(c) %}<span class="badge b-{{ c.value }}" title="Zekerheid op basis van bewijskwaliteit">{{ {'HIGH':'Hoog','MEDIUM':'Middel','LOW':'Laag'}[c.value] }}</span>{% endmacro %}
+{% macro cls(c) %}<span class="badge b-{{ c.value }}">{{ 'Afwijking (geen bewijs)' if c.value == 'ANOMALY' else 'Mogelijke fout' }}</span>{% endmacro %}
+{% macro rstatus(s) %}<span class="badge b-status b-{{ s.value }}">{{ REVIEW_LABELS[s] }}</span>{% endmacro %}
+{% macro cstatus(s) %}<span class="badge b-status">{{ CASE_LABELS[s] }}</span>{% endmacro %}
+{% macro verified(v) %}{% if v %}<span class="badge b-verified">Geverifieerd</span>{% else %}<span class="badge b-unverified">Niet geverifieerd</span>{% endif %}{% endmacro %}
+{% macro value(v, unit) %}{% if v is none %}—{% elif unit == 'EUR' %}{{ v|eur }}{% else %}{{ v|nl }} {{ unit }}{% endif %}{% endmacro %}
+{% macro kpis(s, fee_pct=None) %}
+<div class="grid grid-4">
+  <div class="kpi"><div class="label">Geanalyseerde facturen</div><div class="value">{{ s.invoices_analyzed }}</div><div class="note">Factuurwaarde {{ s.total_invoice_value|eur }} incl. btw</div></div>
+  <div class="kpi potential"><div class="label">Mogelijke discrepanties</div><div class="value">{{ s.potential_discrepancies|eur }}</div><div class="note">Nog te verifiëren — geen vaststaande vordering</div></div>
+  <div class="kpi confirmed"><div class="label">Bevestigde discrepanties</div><div class="value">{{ s.confirmed_discrepancies|eur }}</div><div class="note">Na beoordeling; nog niet door leverancier toegekend</div></div>
+  <div class="kpi recovered"><div class="label">Daadwerkelijk teruggevorderd</div><div class="value">{{ s.recovered|eur }}</div><div class="note">Gecrediteerd of terugbetaald</div></div>
+</div>
+<div class="grid grid-4 mt">
+  <div class="kpi"><div class="label">Ingediend bij leverancier</div><div class="value">{{ s.claimed_amount|eur }}</div></div>
+  <div class="kpi"><div class="label">Toegekend door leverancier</div><div class="value">{{ s.supplier_approved|eur }}</div></div>
+  <div class="kpi"><div class="label">Dossiers: onderzoek / ingediend / teruggevorderd</div><div class="value">{{ s.cases_investigating }} / {{ s.cases_submitted }} / {{ s.cases_recovered }}</div></div>
+  <div class="kpi fee"><div class="label">Succesvergoeding{% if fee_pct is not none %} ({{ fee_pct|nl }}%){% endif %}</div><div class="value">{{ s.success_fee|eur }}</div><div class="note">Alleen over teruggevorderde bedragen</div></div>
+</div>
+<p class="small muted mt">Bedragen excl. btw tenzij anders vermeld. Overlappende bevindingen worden niet dubbel geteld.</p>
+{% endmacro %}

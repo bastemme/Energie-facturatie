@@ -1,0 +1,12 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import cstatus with context %}
+{% block title %}Dossiers{% endblock %}
+{% block content %}
+<h1>Terugvorderingsdossiers</h1>
+<form method="get" class="actions mb"><select name="status"><option value="">Alle statussen</option>{% for s in CaseStatus %}<option value="{{ s.value }}" {% if status == s.value %}selected{% endif %}>{{ CASE_LABELS[s] }}</option>{% endfor %}</select><button class="btn small secondary" type="submit">Filteren</button></form>
+<div class="table-wrap"><table>
+  <tr><th>Dossier</th><th>Klant</th><th>Leverancier</th><th>Status</th><th class="num">Geclaimd</th><th class="num">Toegekend</th><th class="num">Teruggevorderd</th><th class="num">Fee</th></tr>
+  {% for c in cases %}<tr><td><a href="/app/cases/{{ c.id }}">{{ c.reference }}</a></td><td>{{ clients[c.client_id].company_name }}</td><td>{{ c.supplier }}</td><td>{{ cstatus(c.status) }}</td><td class="num">{{ c.disputed_amount|eur }}</td><td class="num">{{ c.confirmed_amount|eur }}</td><td class="num">{{ c.recovered_amount|eur }}</td><td class="num">{{ c.success_fee|eur }}</td></tr>
+  {% else %}<tr><td colspan="8" class="muted">Geen dossiers.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

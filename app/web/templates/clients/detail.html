@@ -1,0 +1,127 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import csrf_field, conf, cls, rstatus, cstatus, verified, kpis with context %}
+{% block title %}{{ client.company_name }}{% endblock %}
+{% block content %}
+<div class="actions"><h1>{{ client.company_name }}</h1></div>
+<p class="muted small">{% if client.kvk_number %}KvK {{ client.kvk_number }} · {% endif %}{{ client.contact_name or '' }} {{ client.contact_email or '' }} · Succesvergoeding {{ client.success_fee_percentage|nl }}%{% if client.engagement_ended_at %} · <strong>Opdracht beëindigd {{ client.engagement_ended_at|d }}</strong>{% endif %}</p>
+{{ kpis(s, client.success_fee_percentage) }}
+<div class="actions mt">
+  {% if user.is_staff %}
+  <form method="post" action="/app/clients/{{ client.id }}/analyse" class="inline">{{ csrf_field() }}<button class="btn" type="submit">Analyse uitvoeren</button></form>
+  <a class="btn secondary" href="/app/clients/{{ client.id }}/cases/new">Dossier aanmaken</a>
+  <a class="btn secondary" href="/app/review?client_id={{ client.id }}">Beoordelingswachtrij</a>
+  {% endif %}
+  <a class="btn secondary" href="/app/clients/{{ client.id }}/report.pdf">Rapportage (PDF)</a>
+</div>
+
+<nav class="tabs"><a href="#documenten">Documenten</a><a href="#facturen">Facturen</a><a href="#bevindingen">Bevindingen</a><a href="#dossiers">Dossiers</a>{% if user.is_staff %}<a href="#contracten">Contracten</a><a href="#gebruikers">Gebruikers</a><a href="#privacy">Privacy</a>{% endif %}</nav>
+
+<h2 id="documenten">Documenten</h2>
+<form method="post" action="/app/clients/{{ client.id }}/upload" enctype="multipart/form-data" class="card">
+  {{ csrf_field() }}
+  <div class="form-row">
+    <div><label for="files">Bestanden (PDF, XLSX, CSV, PNG/JPG)</label><input id="files" name="files" type="file" multiple required></div>
+    <div><label for="declared_type">Soort document</label>
+      <select id="declared_type" name="declared_type"><option value="">Automatisch herkennen</option>
+        {% for t in doc_types %}<option value="{{ t.value }}">{{ t.value }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="actions mt"><button class="btn" type="submit">Uploaden en verwerken</button></div>
+  <p class="small muted">Bestanden worden versleuteld opgeslagen. Excel/CSV-exports volgen het importformaat in de documentatie.</p>
+</form>
+<div class="table-wrap"><table>
+  <tr><th>Bestand</th><th>Soort</th><th>Status</th><th class="num">Zekerheid</th><th>Geüpload</th></tr>
+  {% for d in docs %}
+  <tr><td><a href="/app/documents/{{ d.id }}">{{ d.original_filename }}</a></td><td>{{ d.doc_type.value }}</td><td>{{ d.status.value }}</td>
+    <td class="num">{{ d.extraction_confidence|pct if d.extraction_confidence is not none else '—' }}</td><td>{{ d.created_at|d }}</td></tr>
+  {% else %}<tr><td colspan="5" class="muted">Nog geen documenten.</td></tr>{% endfor %}
+</table></div>
+
+<h2 id="facturen">Facturen</h2>
+<div class="actions mb">{% if user.is_staff %}<a class="btn small secondary" href="/app/invoices/new?client_id={{ client.id }}">Factuur handmatig invoeren</a>{% endif %}</div>
+<div class="table-wrap"><table>
+  <tr><th>Nummer</th><th>Leverancier</th><th>Periode</th><th>EAN</th><th>Type</th><th class="num">Totaal incl. btw</th><th>Gegevens</th></tr>
+  {% for i in invoices %}
+  <tr><td><a href="/app/invoices/{{ i.id }}">{{ i.label }}</a></td><td>{{ i.supplier or '—' }}</td><td class="nowrap">{{ i.period or '—' }}</td>
+    <td class="mono">{{ i.ean or '—' }}</td><td>{{ 'Creditnota' if i.invoice_type.value == 'CREDIT_NOTE' else 'Factuur' }}</td>
+    <td class="num">{{ i.total_incl_vat|eur }}</td><td>{{ verified(i.is_verified) }}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">Nog geen facturen.</td></tr>{% endfor %}
+</table></div>
+
+<h2 id="bevindingen">Bevindingen</h2>
+{% if not user.is_staff %}<p class="notice info">Hier ziet u de bevindingen die door onze specialisten zijn bevestigd. Mogelijke afwijkingen die nog worden onderzocht, zijn opgenomen in het totaal "Mogelijke discrepanties".</p>{% endif %}
+<div class="table-wrap"><table>
+  <tr><th>Bevinding</th><th>Type</th><th>Zekerheid</th><th>Status</th><th class="num">Mogelijk bedrag</th></tr>
+  {% for a in anomalies %}
+  <tr><td><a href="/app/anomalies/{{ a.id }}">{{ a.title }}</a></td><td>{{ cls(a.classification) }}</td><td>{{ conf(a.confidence) }}</td><td>{{ rstatus(a.review_status) }}</td><td class="num">{{ a.potential_recovery|eur }}</td></tr>
+  {% else %}<tr><td colspan="5" class="muted">Geen bevindingen.</td></tr>{% endfor %}
+</table></div>
+
+<h2 id="dossiers">Terugvorderingsdossiers</h2>
+<div class="table-wrap"><table>
+  <tr><th>Dossier</th><th>Leverancier</th><th>Status</th><th class="num">Geclaimd</th><th class="num">Toegekend</th><th class="num">Teruggevorderd</th><th class="num">Fee</th></tr>
+  {% for c in cases %}
+  <tr><td><a href="/app/cases/{{ c.id }}">{{ c.reference }}</a></td><td>{{ c.supplier }}</td><td>{{ cstatus(c.status) }}</td><td class="num">{{ c.disputed_amount|eur }}</td><td class="num">{{ c.confirmed_amount|eur }}</td><td class="num">{{ c.recovered_amount|eur }}</td><td class="num">{{ c.success_fee|eur }}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">Nog geen dossiers.</td></tr>{% endfor %}
+</table></div>
+
+{% if user.is_staff %}
+<h2 id="contracten">Contracten</h2>
+<div class="table-wrap"><table>
+  <tr><th>Leverancier</th><th>Referentie</th><th>Product</th><th>Looptijd</th><th class="num">Prijsregels</th><th>Status</th></tr>
+  {% for c in contracts %}
+  <tr><td><a href="/app/contracts/{{ c.id }}">{{ c.supplier }}</a></td><td>{{ c.contract_reference or '—' }}</td><td>{{ c.commodity.value }}</td><td>{{ c.start_date|d }} – {{ c.end_date|d }}</td><td class="num">{{ c.prices|length }}</td><td>{{ verified(c.verified_at) }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Nog geen contracten vastgelegd.</td></tr>{% endfor %}
+</table></div>
+<form method="post" action="/app/clients/{{ client.id }}/contracts" class="card mt">
+  {{ csrf_field() }}
+  <h3>Contract vastleggen</h3>
+  <div class="form-row">
+    <div><label>Leverancier *</label><input name="supplier" type="text" required></div>
+    <div><label>Contractreferentie</label><input name="contract_reference" type="text"></div>
+    <div><label>Product</label><select name="commodity"><option value="ELECTRICITY">Elektriciteit</option><option value="GAS">Gas</option><option value="MIXED">Beide</option></select></div>
+  </div>
+  <div class="form-row">
+    <div><label>Ingangsdatum *</label><input name="start_date" type="date" required></div>
+    <div><label>Einddatum</label><input name="end_date" type="date"></div>
+    <div><label>EAN (leeg = alle aansluitingen)</label><input name="ean" type="text"></div>
+    <div><label>Brondocument</label><select name="document_id"><option value="">—</option>{% for d in docs %}<option value="{{ d.id }}">{{ d.original_filename }}</option>{% endfor %}</select></div>
+  </div>
+  <label>Indexatie (omschrijving)</label><input name="indexation" type="text">
+  <label>Relevante voorwaarden</label><textarea name="relevant_conditions"></textarea>
+  <div class="actions mt"><button class="btn" type="submit">Contract toevoegen</button></div>
+</form>
+
+<h2 id="gebruikers">Klantgebruikers</h2>
+<ul>{% for u in users %}<li>{{ u.email }}{% if not u.is_active %} (gedeactiveerd){% endif %}</li>{% else %}<li class="muted">Geen klantgebruikers.</li>{% endfor %}</ul>
+{% if user.role.value == 'ADMIN' %}
+<form method="post" action="/app/clients/{{ client.id }}/users" class="card">
+  {{ csrf_field() }}
+  <div class="form-row">
+    <div><label>E-mail</label><input name="email" type="email" required></div>
+    <div><label>Naam</label><input name="full_name" type="text"></div>
+    <div><label>Tijdelijk wachtwoord (min. 12 tekens)</label><input name="password" type="password" required minlength="12"></div>
+  </div>
+  <div class="actions mt"><button class="btn secondary" type="submit">Klantgebruiker toevoegen</button></div>
+</form>
+
+<h2 id="privacy">Privacy (AVG)</h2>
+<div class="card">
+  <p>Bewaartermijn: {{ client.retention_days }} dagen na einde opdracht · Machtiging: {{ 'vastgelegd (' ~ client.consent_text_version ~ ', ' ~ (client.consent_given_at|d) ~ ')' if client.consent_given else 'ontbreekt' }} · AI-verwerking: {{ 'toegestaan' if client.ai_processing_allowed else 'niet toegestaan' }}</p>
+  <div class="actions">
+    <a class="btn secondary" href="/app/clients/{{ client.id }}/export.json">Gegevensexport (inzageverzoek)</a>
+    {% if not client.engagement_ended_at %}<form method="post" action="/app/clients/{{ client.id }}/end-engagement" class="inline">{{ csrf_field() }}<button class="btn secondary" type="submit">Opdracht beëindigen (start bewaartermijn)</button></form>{% endif %}
+  </div>
+  <form method="post" action="/app/clients/{{ client.id }}/delete" class="mt">
+    {{ csrf_field() }}
+    <h3>Alle gegevens permanent verwijderen</h3>
+    <p class="small muted">Verwijdert documenten (inclusief versleutelde bestanden), facturen, bevindingen en dossiers. Dit kan niet ongedaan worden gemaakt. Het auditlog bewaart alleen dat en wanneer er is verwijderd.</p>
+    <div class="form-row">
+      <div><label>Typ de exacte bedrijfsnaam ter bevestiging</label><input name="confirm_name" type="text" required></div>
+      <div><label>Reden</label><input name="reason" type="text" required></div>
+    </div>
+    <div class="actions mt"><button class="btn danger" type="submit">Permanent verwijderen</button></div>
+  </form>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from app.domain.confidence import EvidenceQuality
 from app.domain.enums import Classification, Confidence, ExtractionMethod, InvoiceType, Severity
-from app.domain.money import ZERO, format_decimal_nl, format_eur, round_cents
+from app.domain.money import ZERO, format_decimal_nl, format_eur, format_price, round_cents
 from app.models import (
     Contract,
     ContractPrice,
@@ -43,6 +43,8 @@ class DetectionSettings:
     consumption_drop_ratio: Decimal = Decimal("0.4")
     min_history_periods: int = 3
     vat_deductible: bool = True
+    # Overlaps/gaps up to this many days are treated as date-convention differences ("t/m" vs "tot").
+    period_boundary_tolerance_days: int = 1
 
 
 @dataclass
@@ -180,12 +182,16 @@ def invoice_field_evidence(ctx: AnalysisContext, invoice: Invoice, field_name: s
     }
 
 
+def validity(valid_from: date, valid_to: date | None) -> str:
+    return f"vanaf {valid_from:%d-%m-%Y}" if valid_to is None else f"{valid_from:%d-%m-%Y} t/m {valid_to:%d-%m-%Y}"
+
+
 def contract_price_evidence(cp: ContractPrice) -> dict:
     c = cp.contract
     return {
         "kind": "contract_price",
         "label": (f"Contract {c.contract_reference or c.supplier}: {cp.category.value} "
-                  f"€ {format_decimal_nl(cp.price)}/{cp.unit} geldig {cp.period}"),
+                  f"€ {format_price(cp.price)}/{cp.unit} geldig {validity(cp.valid_from, cp.valid_to)}"),
         "contract_id": c.id,
         "contract_price_id": cp.id,
         "document_id": c.document_id,

@@ -123,3 +123,13 @@ class TestConfidence:
 
     def test_no_evidence_is_low(self):
         assert confidence_from_evidence([]) == Confidence.LOW
+
+
+def test_format_price():
+    from app.domain.money import format_price
+
+    assert format_price(D("0.20")) == "0,20"
+    assert format_price(D("0.2")) == "0,20"
+    assert format_price(D("0.18450")) == "0,1845"
+    assert format_price(D("200")) == "200,00"
+    assert format_price(D("0.10154")) == "0,10154"

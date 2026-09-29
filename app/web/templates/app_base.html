@@ -1,0 +1,36 @@
+{% from "_macros.html" import csrf_field with context %}
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{% block title %}Portaal{% endblock %} · {{ operator_name }}</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar"><div class="container">
+  <a class="brand" href="/app">{{ operator_name }}</a>
+  {% if user %}
+  <nav class="nav">
+    {% if user.is_staff %}
+      <a href="/app/admin">Overzicht</a>
+      <a href="/app/clients">Klanten</a>
+      <a href="/app/review">Beoordelen</a>
+      <a href="/app/cases">Dossiers</a>
+      <a href="/app/leads">Leads</a>
+      <a href="/app/reference-rates">Referentietarieven</a>
+      {% if user.role.value == 'ADMIN' %}<a href="/app/users">Gebruikers</a><a href="/app/audit">Auditlog</a>{% endif %}
+    {% else %}
+      <a href="/app/clients/{{ user.client_id }}">Mijn overzicht</a>
+    {% endif %}
+    <form method="post" action="/logout">{{ csrf_field() }}<button type="submit">Uitloggen</button></form>
+  </nav>
+  {% endif %}
+</div></header>
+<main><div class="container">
+  {% for m in messages %}<div class="flash {{ m.kind }}">{{ m.message }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+</div></main>
+</body>
+</html>

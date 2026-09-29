@@ -1,0 +1,44 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import kpis with context %}
+{% block title %}Overzicht{% endblock %}
+{% block content %}
+<h1>Overzicht</h1>
+{{ kpis(s) }}
+<h2>Operationeel</h2>
+<div class="grid grid-4">
+  <div class="kpi"><div class="label">Beoordelingswachtrij</div><div class="value"><a href="/app/review">{{ m.review_queue }}</a></div></div>
+  <div class="kpi"><div class="label">Extractie geslaagd</div><div class="value">{{ m.extraction_success_rate|pct if m.extraction_success_rate is not none else '—' }}</div><div class="note">{{ m.invoice_documents }} factuurdocumenten</div></div>
+  <div class="kpi"><div class="label">Fout-positief ratio</div><div class="value">{{ m.false_positive_rate|pct if m.false_positive_rate is not none else '—' }}</div><div class="note">afgewezen / (bevestigd + afgewezen)</div></div>
+  <div class="kpi"><div class="label">Bevindingen: gedetecteerd / bevestigd / afgewezen</div><div class="value">{{ m.anomalies_detected }} / {{ m.anomalies_confirmed }} / {{ m.anomalies_rejected }}</div></div>
+  <div class="kpi recovered"><div class="label">Teruggevorderd per 1.000 facturen</div><div class="value">{{ m.recovered_per_1000_invoices|eur }}</div><div class="note">Kern-KPI</div></div>
+  <div class="kpi"><div class="label">Gem. mogelijk bedrag per factuur</div><div class="value">{{ m.avg_potential_per_invoice|eur }}</div></div>
+  <div class="kpi fee"><div class="label">Omzet (succesvergoedingen)</div><div class="value">{{ m.revenue|eur }}</div></div>
+  <div class="kpi"><div class="label">Verwerkingskosten (geregistreerd)</div><div class="value">€ {{ '%.2f'|format(m.processing_cost_eur)|replace('.', ',') }}</div></div>
+</div>
+
+<h2>Klanten</h2>
+<div class="table-wrap"><table>
+  <tr><th>Klant</th><th class="num">Facturen</th><th class="num">Mogelijk</th><th class="num">Bevestigd</th><th class="num">Ingediend</th><th class="num">Teruggevorderd</th><th class="num">Fee</th></tr>
+  {% for c, cs in client_rows %}<tr><td><a href="/app/clients/{{ c.id }}">{{ c.company_name }}</a></td><td class="num">{{ cs.invoices_analyzed }}</td><td class="num">{{ cs.potential_discrepancies|eur }}</td><td class="num">{{ cs.confirmed_discrepancies|eur }}</td><td class="num">{{ cs.claimed_amount|eur }}</td><td class="num">{{ cs.recovered|eur }}</td><td class="num">{{ cs.success_fee|eur }}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">Nog geen klanten.</td></tr>{% endfor %}
+</table></div>
+
+<div class="grid grid-2 mt">
+  <div>
+    <h2>Documenten die aandacht vragen</h2>
+    <p class="muted small">{{ m.low_confidence_documents }} totaal (lage zekerheid, OCR nodig of mislukt)</p>
+    <ul>{% for d in problem_docs %}<li><a href="/app/documents/{{ d.id }}">{{ d.original_filename }}</a> — {{ d.status.value }} ({{ clients[d.client_id].company_name if d.client_id in clients else '' }})</li>{% else %}<li class="muted">Geen.</li>{% endfor %}</ul>
+    <h2>Systeemfouten in analyses</h2>
+    <ul>{% for r in failed_runs %}<li>{{ r.created_at|d }} — {{ clients[r.client_id].company_name if r.client_id in clients else r.client_id }}: {% for e in r.errors %}{{ e.rule_id }} ({{ e.error }}) {% endfor %}</li>{% else %}<li class="muted">Geen.</li>{% endfor %}</ul>
+    <h2>Nieuwe leads</h2>
+    <ul>{% for l in new_leads %}<li>{{ l.company_name }} — {{ l.contact_name }} ({{ l.created_at|d }})</li>{% else %}<li class="muted">Geen.</li>{% endfor %}</ul>
+  </div>
+  <div>
+    <h2>Precisie per controleregel</h2>
+    <div class="table-wrap"><table><tr><th>Regel</th><th class="num">Totaal</th><th class="num">Bevestigd</th><th class="num">Afgewezen</th><th class="num">Precisie</th></tr>
+    {% for r in m.rule_stats %}<tr><td class="mono">{{ r.rule_id }}</td><td class="num">{{ r.total }}</td><td class="num">{{ r.confirmed }}</td><td class="num">{{ r.rejected }}</td><td class="num">{{ r.precision|pct if r.precision is not none else '—' }}</td></tr>{% else %}<tr><td colspan="5" class="muted">Nog geen data.</td></tr>{% endfor %}</table></div>
+    <h2>Documenten per status</h2>
+    <ul>{% for k, v in m.documents_by_status.items() %}<li>{{ k }}: {{ v }}</li>{% else %}<li class="muted">Geen.</li>{% endfor %}</ul>
+  </div>
+</div>
+{% endblock %}

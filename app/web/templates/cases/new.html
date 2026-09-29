@@ -1,0 +1,17 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import csrf_field, conf with context %}
+{% block title %}Nieuw dossier{% endblock %}
+{% block content %}
+<p class="small"><a href="/app/clients/{{ client.id }}">← {{ client.company_name }}</a></p>
+<h1>Nieuw terugvorderingsdossier</h1>
+<p class="notice info">Alleen bevestigde bevindingen die nog niet in een dossier zitten, kunnen worden opgenomen. Een dossier bevat bevindingen van één leverancier.</p>
+<form method="post" action="/app/clients/{{ client.id }}/cases" class="card">{{ csrf_field() }}
+  <div class="table-wrap"><table>
+    <tr><th></th><th>Factuur</th><th>Leverancier</th><th>Bevinding</th><th>Zekerheid</th><th class="num">Bedrag</th></tr>
+    {% for a in anomalies %}<tr><td><input type="checkbox" name="anomaly_ids" value="{{ a.id }}" aria-label="Selecteer"></td><td>{{ a.invoice.label if a.invoice else '—' }}</td><td>{{ a.invoice.supplier if a.invoice else '—' }}</td><td><a href="/app/anomalies/{{ a.id }}">{{ a.title }}</a></td><td>{{ conf(a.confidence) }}</td><td class="num">{{ a.potential_recovery|eur }}</td></tr>
+    {% else %}<tr><td colspan="6" class="muted">Geen bevestigde bevindingen beschikbaar.</td></tr>{% endfor %}
+  </table></div>
+  <label for="note">Notitie</label><textarea id="note" name="note"></textarea>
+  <div class="actions mt"><button class="btn" type="submit">Dossier aanmaken</button></div>
+</form>
+{% endblock %}

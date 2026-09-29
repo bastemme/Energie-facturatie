@@ -1,0 +1,10 @@
+{% extends "app_base.html" %}
+{% block title %}Auditlog{% endblock %}
+{% block content %}
+<h1>Auditlog</h1>
+<p class="muted small">Laatste 500 gebeurtenissen. Bevat geen bedragen of documentinhoud.</p>
+<div class="table-wrap"><table>
+  <tr><th>Tijd</th><th>Gebruiker</th><th>Actie</th><th>Object</th><th>IP</th><th>Details</th></tr>
+  {% for r in rows %}<tr><td class="nowrap">{{ r.created_at|d }}</td><td>{{ users[r.user_id].email if r.user_id in users else (r.user_id or '—') }}</td><td class="mono">{{ r.action }}</td><td class="mono small">{{ r.object_type or '' }} {{ (r.object_id or '')[:8] }}</td><td class="small">{{ r.ip_address or '' }}</td><td class="small mono">{{ r.details or '' }}</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

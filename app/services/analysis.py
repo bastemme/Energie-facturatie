@@ -36,6 +36,7 @@ def detection_settings(client: Client) -> DetectionSettings:
         consumption_spike_ratio=s.consumption_spike_ratio,
         consumption_drop_ratio=s.consumption_drop_ratio,
         min_history_periods=s.min_history_periods,
+        period_boundary_tolerance_days=s.period_boundary_tolerance_days,
         vat_deductible=client.vat_deductible,
     )
 

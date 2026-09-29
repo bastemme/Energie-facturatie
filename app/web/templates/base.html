@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ operator_name }}{% endblock %}</title>
+<meta name="description" content="{% block description %}Controle van zakelijke energiefacturen op fouten en gemiste correcties. Geen resultaat, geen factuur.{% endblock %}">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="site-header"><div class="container">
+  <a class="brand" href="/">{{ operator_name }}</a>
+  <nav><a href="/#hoe-het-werkt">Hoe het werkt</a><a href="/#wat-we-controleren">Wat we controleren</a><a href="/#faq">Vragen</a><a href="/login">Inloggen</a></nav>
+</div></header>
+{% block body %}{% endblock %}
+<footer class="site-footer"><div class="container">
+  © {{ operator_name }} · <a href="/privacy">Privacy &amp; beveiliging</a> · <a href="mailto:{{ operator_email }}">{{ operator_email }}</a>
+</div></footer>
+</body>
+</html>

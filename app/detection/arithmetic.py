@@ -17,7 +17,7 @@ from app.detection.base import (
 )
 from app.domain.confidence import EvidenceQuality, confidence_from_evidence
 from app.domain.enums import Classification
-from app.domain.money import ZERO, format_decimal_nl, round_cents
+from app.domain.money import ZERO, format_decimal_nl, format_price, round_cents
 
 LINE_RULE = "line_arithmetic"
 TOTALS_RULE = "invoice_totals"
@@ -57,7 +57,7 @@ def detect_line_arithmetic(ctx: AnalysisContext) -> list[Finding]:
                 title=f"Regelbedrag klopt niet met hoeveelheid × tarief ({inv.label})",
                 description=(
                     f"De regel '{line.description}' op {invoice_ref(inv)} vermeldt "
-                    f"{format_decimal_nl(line.quantity)} {line.unit or ''} × € {format_decimal_nl(line.unit_price)} "
+                    f"{format_decimal_nl(line.quantity)} {line.unit or ''} × € {format_price(line.unit_price)} "
                     f"= {eur(expected)}, maar het gefactureerde bedrag is {eur(line.amount)}. "
                     f"Verschil: {eur(diff)}."
                 ),
@@ -65,7 +65,7 @@ def detect_line_arithmetic(ctx: AnalysisContext) -> list[Finding]:
                 invoice=inv, line=line, actual=line.amount, expected=expected, difference=diff,
                 potential_recovery=overcharge,
                 calculation=[
-                    f"{format_decimal_nl(line.quantity)} × {format_decimal_nl(line.unit_price)} = "
+                    f"{format_decimal_nl(line.quantity)} × {format_price(line.unit_price)} = "
                     f"{format_decimal_nl(line.quantity * line.unit_price)} → afgerond {eur(expected)}",
                     f"Gefactureerd: {eur(line.amount)}",
                     f"Verschil: {eur(line.amount)} − {eur(expected)} = {eur(diff)}",

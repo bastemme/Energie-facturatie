@@ -1,0 +1,21 @@
+{% extends "app_base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+{% block title %}Gebruikers{% endblock %}
+{% block content %}
+<h1>Gebruikers</h1>
+<div class="table-wrap"><table>
+  <tr><th>E-mail</th><th>Naam</th><th>Rol</th><th>Klant</th><th>Laatste login</th><th></th></tr>
+  {% for u in users %}<tr><td>{{ u.email }}</td><td>{{ u.full_name or '' }}</td><td>{{ u.role.value }}</td><td>{{ clients[u.client_id].company_name if u.client_id in clients else '' }}</td><td>{{ u.last_login_at|d }}</td>
+  <td>{% if u.is_active and u.id != user.id %}<form method="post" action="/app/users/{{ u.id }}/deactivate" class="inline">{{ csrf_field() }}<button class="btn small secondary" type="submit">Deactiveren</button></form>{% elif not u.is_active %}gedeactiveerd{% endif %}</td></tr>{% endfor %}
+</table></div>
+<form method="post" action="/app/users" class="card mt">{{ csrf_field() }}
+  <h3>Medewerker toevoegen</h3>
+  <div class="form-row">
+    <div><label>E-mail</label><input name="email" type="email" required></div>
+    <div><label>Naam</label><input name="full_name" type="text"></div>
+    <div><label>Rol</label><select name="role"><option value="REVIEWER">Beoordelaar</option><option value="ADMIN">Beheerder</option></select></div>
+    <div><label>Tijdelijk wachtwoord (min. 12)</label><input name="password" type="password" required minlength="12"></div>
+  </div>
+  <div class="actions mt"><button class="btn" type="submit">Toevoegen</button></div>
+</form>
+{% endblock %}
