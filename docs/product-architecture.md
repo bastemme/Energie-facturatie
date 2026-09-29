@@ -1,6 +1,6 @@
 # Energy Invoice Recovery Engine — Product Architecture
 
-Status: MVP foundation · Last updated: 2026-09-29
+Status: MVP implemented (phases 1–13) · Last updated: 2026-09-29
 
 ## 1. Product overview
 
@@ -328,3 +328,43 @@ hook exist), multi-currency, S3 storage, SSO/2FA.
 | AI | Optional, off by default, never a source of numbers | Privacy and auditability. |
 | Files | Fernet-encrypted local disk | Simple and secure at MVP scale. The interface allows S3 later. |
 | DB | SQLite dev/test, Postgres prod | Zero-setup dev. Production-grade in deployment. |
+
+## 16. Decisions made during implementation
+
+These came from running the engine on the synthetic demo and from the tests. Each one is covered by a test.
+
+| # | Decision | Reason |
+|---|---|---|
+| D1 | Unverified PDF extraction caps a finding at **MEDIUM** confidence. HIGH requires a structured source (CSV/XLSX/manual) or a reviewer-verified invoice. Re-running analysis after verification upgrades the finding. | A regex-parsed value no human has checked cannot support a HIGH claim. |
+| D2 | **Display-rounded tariffs are not arithmetic errors.** Skip when rounding amount/quantity to 2–5 decimals reproduces the printed tariff (e.g. printed €0,10, calculated €0,10154). | The most common false positive for qty × price checks. Independent of how the DB stores trailing zeros. |
+| D3 | **Conservative aggregation**: per line take the max of its findings, per invoice max(Σ line maxima, largest invoice-level finding). | Several rules can describe the same euro. Totals may understate but never overstate. |
+| D4 | Recoveries are **excl. VAT**. Clients default to `vat_deductible = true`, which puts VAT findings at €0 potential recovery with an explanation. | For a VAT-deducting business a VAT overcharge has no net value. |
+| D5 | Overlaps/gaps of ≤ 1 day are ignored (`ER_PERIOD_BOUNDARY_TOLERANCE_DAYS`). | Inclusive vs exclusive end dates ("t/m" vs "tot") differ per supplier. |
+| D6 | Fixed charges are flagged only when billed units exceed the period by > max(10 %, 0.1 month / 1 day). Under-billing is never flagged. | Anniversary billing (15-01 t/m 14-02) and 28–31 day months are normal. |
+| D7 | Periods are grouped per **EAN**, not per supplier; network-operator invoices form a separate group. | Two suppliers billing the same connection (switching error) is a real recovery source, while a netbeheerder invoice legitimately overlaps a supplier invoice. |
+| D8 | The same supplier + invoice number + total is treated as a **data duplicate** (e.g. PDF and Excel of the same invoice). The best-sourced copy is kept and the others are excluded from analysis. | Prevents double counting across input formats. It is reported as an anomaly, not a billing error. |
+| D9 | Client users see only **reviewer-confirmed** findings. Unreviewed potential amounts appear only as an aggregate labelled "nog te verifiëren". | Speculative findings must not be presented to clients as facts. |
+| D10 | Energy tax: brackets are applied **pro rata to the billing period** as a stated assumption, only with verified rates, capped at MEDIUM. A missing tax reduction is an anomaly with €0. | Legally sensitive and time-dependent. The explanation states the assumption explicitly. |
+| D11 | The success fee requires a **receipt reference** (credit note / payment ID) when the recovered amount is entered. | "Recovered" must be provable. |
+| D12 | Money in exports is normalized to 2 decimals and other decimals to canonical form. | Postgres NUMERIC pads the scale (`50.0000`). Claim files must not depend on the backend. |
+
+## 17. Implementation status
+
+| Phase | Status |
+|---|---|
+| 1 Repository & architecture | Done. Greenfield (the repo was empty). |
+| 2 Data model | Done: `app/models`, exact decimals, provenance table |
+| 3 Invoice ingestion | Done: validation, dedupe, encryption, classification |
+| 4 Deterministic extraction | Done for text PDFs (generic NL parser), CSV/XLSX, and meter data. OCR not yet. |
+| 5–6 Reconciliation & anomaly engine | Done: 11 modules, 16 rules |
+| 7 Review dashboard | Done, including source-page rendering with highlight |
+| 8 Case management | Done: state machine, amounts, events |
+| 9 Reports | Done: client report PDF, claim package (PDF + JSON + attachments), Dutch letter |
+| 10 Landing page | Done, with lead capture |
+| 11 Testing | 155 tests, passing on SQLite and PostgreSQL 16 |
+| 12 Security review | Done. See operations.md for the remaining limitations. |
+| 13 Deployment | Dockerfile, docker-compose (Postgres, tmpfs), CI workflow |
+
+**Most important next step:** run the engine on 50–100 real, anonymized invoices from 3–5 suppliers.
+Build supplier-specific parsers where the generic parser falls short, and track per-rule precision
+(admin dashboard) before scaling acquisition.

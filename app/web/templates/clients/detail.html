@@ -37,7 +37,7 @@
 </table></div>
 
 <h2 id="facturen">Facturen</h2>
-<div class="actions mb">{% if user.is_staff %}<a class="btn small secondary" href="/app/invoices/new?client_id={{ client.id }}">Factuur handmatig invoeren</a>{% endif %}</div>
+<div class="actions mb">{% if user.is_staff %}<form method="post" action="/app/invoices/new" class="inline">{{ csrf_field() }}<input type="hidden" name="client_id" value="{{ client.id }}"><button class="btn small secondary" type="submit">Factuur handmatig invoeren</button></form>{% endif %}</div>
 <div class="table-wrap"><table>
   <tr><th>Nummer</th><th>Leverancier</th><th>Periode</th><th>EAN</th><th>Type</th><th class="num">Totaal incl. btw</th><th>Gegevens</th></tr>
   {% for i in invoices %}

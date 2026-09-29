@@ -15,7 +15,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.domain.enums import Classification, ReviewStatus
-from app.domain.money import format_eur
+from app.domain.money import format_eur, round_cents
 from app.ingestion.storage import get_store
 from app.models import Anomaly, Client, Document, Invoice, RecoveryCase
 from app.models.base import utcnow
@@ -141,17 +141,22 @@ def claim_pdf(case: RecoveryCase, client: Client, letter: Letter, items: list[Cl
 
 
 def case_json(case: RecoveryCase, client: Client, items: list[ClaimItem]) -> dict:
-    def d(v):
-        return None if v is None else str(v)
+    def d(v):  # non-monetary values: canonical, backend-independent (Postgres pads NUMERIC scale)
+        if v is None:
+            return None
+        return format(v.normalize(), "f") if isinstance(v, Decimal) else str(v)
+
+    def m(v):  # money: always exactly 2 decimals
+        return None if v is None else str(round_cents(v))
 
     return {
         "schema": "energy-recovery.case/v1",
         "generated_at": utcnow().isoformat(),
         "case": {
             "id": case.id, "reference": case.reference, "supplier": case.supplier, "status": case.status.value,
-            "disputed_amount": d(case.disputed_amount), "confirmed_amount": d(case.confirmed_amount),
-            "recovered_amount": d(case.recovered_amount), "success_fee_percentage": d(case.success_fee_percentage),
-            "success_fee": d(case.success_fee), "created_at": case.created_at.isoformat() if case.created_at else None,
+            "disputed_amount": m(case.disputed_amount), "confirmed_amount": m(case.confirmed_amount),
+            "recovered_amount": m(case.recovered_amount), "success_fee_percentage": d(case.success_fee_percentage),
+            "success_fee": m(case.success_fee), "created_at": case.created_at.isoformat() if case.created_at else None,
             "submitted_at": case.submitted_at.isoformat() if case.submitted_at else None,
             "closed_at": case.closed_at.isoformat() if case.closed_at else None,
         },
@@ -162,7 +167,7 @@ def case_json(case: RecoveryCase, client: Client, items: list[ClaimItem]) -> dic
             "classification": i.anomaly.classification.value, "confidence": i.anomaly.confidence.value,
             "review_status": i.anomaly.review_status.value, "unit": i.anomaly.unit,
             "actual": d(i.anomaly.actual_value), "expected": d(i.anomaly.expected_value),
-            "difference": d(i.anomaly.difference), "potential_recovery": d(i.anomaly.potential_recovery),
+            "difference": d(i.anomaly.difference), "potential_recovery": m(i.anomaly.potential_recovery),
             "calculation": i.anomaly.calculation, "evidence": i.anomaly.evidence,
             "invoice": None if i.invoice is None else {
                 "id": i.invoice.id, "number": i.invoice.invoice_number, "document_id": i.invoice.document_id,

@@ -19,7 +19,7 @@
   <a class="btn secondary" href="/app/documents/{{ doc.id }}/download">Download origineel</a>
   {% if doc.mime_type == 'application/pdf' %}<a class="btn secondary" href="/app/documents/{{ doc.id }}/view/1">Bekijk pagina 1</a>{% endif %}
   {% if user.is_staff %}
-  <a class="btn secondary" href="/app/invoices/new?client_id={{ doc.client_id }}&document_id={{ doc.id }}">Factuur handmatig invoeren</a>
+  <form method="post" action="/app/invoices/new" class="inline">{{ csrf_field() }}<input type="hidden" name="client_id" value="{{ doc.client_id }}"><input type="hidden" name="document_id" value="{{ doc.id }}"><button class="btn secondary" type="submit">Factuur handmatig invoeren</button></form>
   <form method="post" action="/app/documents/{{ doc.id }}/reprocess" class="inline">{{ csrf_field() }}
     <select name="declared_type"><option value="">Automatisch</option><option value="INVOICE">Factuur</option><option value="CREDIT_NOTE">Creditnota</option><option value="CONTRACT">Contract</option><option value="OTHER">Overig</option></select>
     <button class="btn secondary" type="submit">Opnieuw verwerken</button></form>

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import Request
 from fastapi.responses import RedirectResponse
@@ -82,6 +83,13 @@ def form_date(value: str | None) -> date | None:
     if d is None:
         raise ValueError(f"Ongeldige datum: {value}")
     return d
+
+
+def attachment(filename: str) -> dict[str, str]:
+    """Content-Disposition that is safe for any filename (RFC 6266/5987) plus nosniff."""
+    ascii_name = "".join(ch if 32 <= ord(ch) < 127 and ch not in '"\\' else "_" for ch in filename) or "download"
+    return {"Content-Disposition": f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}",
+            "X-Content-Type-Options": "nosniff"}
 
 
 def client_ip(request: Request) -> str | None:

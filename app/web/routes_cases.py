@@ -24,7 +24,7 @@ from app.services.cases import (
 )
 from app.services.correspondence import build_items, generate_letter
 from app.services.reports import claim_package_zip, invoices_by_id
-from app.web.deps import client_ip, flash, form_decimal, redirect, render
+from app.web.deps import attachment, client_ip, flash, form_decimal, redirect, render
 from app.web.security import get_client_for, get_owned, require_staff, require_user, verify_csrf
 
 router = APIRouter()
@@ -162,4 +162,4 @@ def case_package(case_id: str, request: Request, user: User = Depends(require_st
     add_note(db, case, "Claimpakket gegenereerd.", user)
     db.commit()
     return Response(data, media_type="application/zip",
-                    headers={"Content-Disposition": f'attachment; filename="{case.reference}.zip"'})
+                    headers=attachment(f"{case.reference}.zip"))

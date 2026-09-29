@@ -2,6 +2,8 @@ import os
 
 os.environ.setdefault("ER_ENVIRONMENT", "test")
 os.environ.setdefault("ER_DATABASE_URL", "sqlite://")
+# Run the suite against PostgreSQL with: ER_TEST_DATABASE_URL=postgresql+psycopg://... pytest
+TEST_DB_URL = os.environ.get("ER_TEST_DATABASE_URL", "sqlite://")
 
 import pytest  # noqa: E402
 from cryptography.fernet import Fernet  # noqa: E402
@@ -14,7 +16,7 @@ from app.config import get_settings  # noqa: E402
 def _settings(tmp_path, monkeypatch):
     monkeypatch.setenv("ER_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("ER_STORAGE_ENCRYPTION_KEY", Fernet.generate_key().decode())
-    monkeypatch.setenv("ER_DATABASE_URL", "sqlite://")
+    monkeypatch.setenv("ER_DATABASE_URL", TEST_DB_URL)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -22,7 +24,8 @@ def _settings(tmp_path, monkeypatch):
 
 @pytest.fixture
 def db():
-    db_module.init_engine("sqlite://")
+    db_module.init_engine(TEST_DB_URL)
+    db_module.Base.metadata.drop_all(db_module.get_engine())
     db_module.create_all()
     session = db_module.session_factory()()
     try:

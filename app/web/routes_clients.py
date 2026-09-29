@@ -48,7 +48,7 @@ from app.services.audit import audit
 from app.services.metrics import summary
 from app.services.privacy import erase_client, export_client_data
 from app.services.reports import client_report_pdf, reportable_anomalies
-from app.web.deps import client_ip, flash, form_date, form_decimal, redirect, render
+from app.web.deps import attachment, client_ip, flash, form_date, form_decimal, redirect, render
 from app.web.security import (
     get_client_for,
     get_owned,
@@ -218,7 +218,7 @@ def client_report(client_id: str, request: Request, user: User = Depends(require
           ip=client_ip(request))
     db.commit()
     return Response(pdf, media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="rapportage-{client.id[:8]}.pdf"'})
+                    headers=attachment(f"rapportage-{client.id[:8]}.pdf"))
 
 
 @router.post("/app/clients/{client_id}/users", dependencies=[Depends(verify_csrf)])
@@ -251,7 +251,7 @@ def export_json(client_id: str, request: Request, user: User = Depends(require_a
           ip=client_ip(request))
     db.commit()
     return Response(json.dumps(data, indent=2, ensure_ascii=False), media_type="application/json",
-                    headers={"Content-Disposition": f'attachment; filename="export-{client.id[:8]}.json"'})
+                    headers=attachment(f"export-{client.id[:8]}.json"))
 
 
 @router.post("/app/clients/{client_id}/end-engagement", dependencies=[Depends(verify_csrf)])
@@ -300,7 +300,7 @@ def document_download(doc_id: str, request: Request, user: User = Depends(requir
           ip=client_ip(request))
     db.commit()
     return Response(content, media_type=doc.mime_type,
-                    headers={"Content-Disposition": f'attachment; filename="{doc.original_filename}"'})
+                    headers=attachment(f"{doc.original_filename}"))
 
 
 @router.get("/app/documents/{doc_id}/page/{page}.png")
@@ -352,8 +352,8 @@ def document_reprocess(doc_id: str, request: Request, declared_type: str = Form(
 # ---------------------------------------------------------------- invoices (review & manual correction)
 
 
-@router.get("/app/invoices/new")
-def invoice_new(client_id: str, request: Request, document_id: str | None = None,
+@router.post("/app/invoices/new", dependencies=[Depends(verify_csrf)])
+def invoice_new(request: Request, client_id: str = Form(...), document_id: str = Form(""),
                 user: User = Depends(require_staff), db: Session = Depends(get_db)):
     client = get_client_for(db, user, client_id)
     doc = get_owned(db, Document, document_id, user) if document_id else None

@@ -22,8 +22,11 @@ PASSWORD = "correct-horse-battery"
 @pytest.fixture
 def app_client():
     from app.web.app import create_app
+    from tests.conftest import TEST_DB_URL
 
-    app = create_app("sqlite://")
+    db_module.init_engine(TEST_DB_URL)
+    db_module.Base.metadata.drop_all(db_module.get_engine())
+    app = create_app(TEST_DB_URL)
     with TestClient(app) as c:
         yield c
     login_throttle._buckets.clear()
@@ -383,3 +386,19 @@ def test_reference_rate_admin_flow(app_client):
     app_client.post(f"/app/reference-rates/{rate.id}/verify", data={"csrf_token": token})
     with session() as s:
         assert s.get(ReferenceRate, rate.id).verified_at is not None
+
+
+def test_unicode_filename_download_and_no_state_change_on_get(app_client):
+    make_user("admin@op.nl", Role.ADMIN)
+    client_id = make_client()
+    login(app_client, "admin@op.nl")
+    token = csrf(app_client, f"/app/clients/{client_id}")
+    app_client.post(f"/app/clients/{client_id}/upload", data={"csrf_token": token},
+                    files=[("files", ("фактура ë.pdf", render_invoice_pdf(electricity_invoice()), "application/pdf"))])
+    with session() as s:
+        doc_id = s.scalar(select(Document.id))
+    r = app_client.get(f"/app/documents/{doc_id}/download")
+    assert r.status_code == 200 and "filename*=UTF-8''" in r.headers["content-disposition"]
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert app_client.get(f"/app/invoices/new?client_id={client_id}").status_code in (404, 405)
+    assert app_client.post("/app/invoices/new", data={"client_id": client_id}).status_code == 403  # no CSRF

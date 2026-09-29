@@ -1,0 +1,36 @@
+# Production-like stack. Put a TLS-terminating reverse proxy (Caddy/Traefik/nginx) in front of `app`.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: energy_recovery
+      POSTGRES_USER: energy_recovery
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U energy_recovery"]
+      interval: 10s
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      ER_DATABASE_URL: postgresql+psycopg://energy_recovery:${POSTGRES_PASSWORD}@db:5432/energy_recovery
+    volumes:
+      - documents:/data
+    # Upload bodies > 1 MB are spooled to /tmp before encryption: keep them in RAM only.
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    read_only: true
+    ports:
+      - "127.0.0.1:8000:8000"
+
+volumes:
+  pgdata:
+  documents:
