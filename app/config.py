@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     agents_autorun: bool = True  # run queued tasks in the background right after they are created
     research_provider: str = "openstreetmap"  # openstreetmap | mock (development/tests, clearly marked)
     overpass_url: str = "https://overpass-api.de/api/interpreter"
+    # Tried in order when a server is busy (429/5xx) or times out; comma-separated.
+    overpass_fallback_urls: str = ("https://overpass.kumi.systems/api/interpreter,"
+                                   "https://overpass.private.coffee/api/interpreter")
     research_user_agent: str = "Factuurspoor-LeadResearcher/0.1 (+https://factuurspoor.nl; info@example.nl)"
     research_fetch_timeout: float = 8.0
     research_max_website_fetches: int = 15

@@ -364,3 +364,55 @@ def test_research_provider_is_mock_in_tests():
     from app.integrations.web.research import get_research_provider
 
     assert get_research_provider().is_test_data is True
+
+
+def _fake_overpass(monkeypatch, responder):
+    import json as _json
+
+    from app.integrations.web import http as web_http
+
+    calls = []
+
+    def post_form(url, data, **kw):
+        calls.append((url, data["data"]))
+        status, payload = responder(url, data["data"], len(calls))
+        return web_http.HttpResponse(url, status, "application/json", _json.dumps(payload), False)
+
+    monkeypatch.setattr(web_http, "post_form", post_form)
+    return calls
+
+
+def _element(i):
+    return {"type": "node", "id": i, "lat": 51.5, "lon": 5.0, "tags": {"name": f"Bedrijf {i}", "website": "x.nl"}}
+
+
+def test_busy_overpass_server_falls_back_to_the_next(monkeypatch):
+    from app.integrations.web.openstreetmap import OpenStreetMapProvider
+
+    calls = _fake_overpass(monkeypatch, lambda url, q, n: (504, {}) if "overpass-api.de" in url
+                           else (200, {"elements": [_element(1)]}))
+    out = OpenStreetMapProvider().search_businesses(['["man_made"="works"]'], "Tilburg", 5, "manufacturing")
+    assert [c.name for c in out] == ["Bedrijf 1"]
+    assert "overpass-api.de" in calls[0][0] and "kumi" in calls[1][0]
+
+
+def test_all_servers_busy_gives_a_clear_error(monkeypatch):
+    from app.integrations.web.openstreetmap import OpenStreetMapProvider
+
+    _fake_overpass(monkeypatch, lambda url, q, n: (504, {}))
+    with pytest.raises(WebAccessError, match="overbelast"):
+        OpenStreetMapProvider().search_businesses(['["man_made"="works"]'], "Tilburg", 5, "manufacturing")
+
+
+def test_whole_country_is_searched_province_by_province(monkeypatch):
+    from app.integrations.web.openstreetmap import OpenStreetMapProvider
+
+    def responder(url, q, n):
+        if "NL-" not in q:
+            return 500, {}
+        return 200, {"elements": [_element(n * 10 + k) for k in range(2)]}
+
+    calls = _fake_overpass(monkeypatch, responder)
+    out = OpenStreetMapProvider().search_businesses(['["man_made"="works"]'], "Nederland", 5, "manufacturing")
+    assert len(out) == 5 and len(calls) == 3  # stops once enough companies are found
+    assert all('"ISO3166-2"="NL-' in q for _, q in calls)

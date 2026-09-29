@@ -83,7 +83,7 @@ def get(url: str, *, timeout: float | None = None, max_bytes: int = 600_000, che
     raise WebAccessError("Te veel doorverwijzingen")
 
 
-def post_form(url: str, data: dict, *, timeout: float = 100.0, check_url=_check_url) -> HttpResponse:
+def post_form(url: str, data: dict, *, timeout: float = 75.0, check_url=_check_url) -> HttpResponse:
     check_url(url)
     with _client(timeout) as client:
         try:
