@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
 from app.domain.enums import Classification, Confidence, ReviewStatus
-from app.models import Anomaly, Client, User
+from app.models import Anomaly, Client, Document, User
+from app.services.audit import audit
 from app.services.recovery import conservative_total
 from app.services.review import ReviewError, review
 from app.web.deps import client_ip, flash, redirect, render
-from app.web.security import get_owned, require_staff, require_user, verify_csrf
+from app.web.security import can_access_client, get_owned, require_staff, require_user, verify_csrf
+from app.web.view import box_for, ensure_page_sizes, finding_view
 
 router = APIRouter()
 QUEUE_DEFAULT = [ReviewStatus.OPEN, ReviewStatus.INVESTIGATING, ReviewStatus.INFO_REQUESTED]
@@ -46,10 +48,12 @@ def review_queue(request: Request, client_id: str = "", status: str = "", confid
 
 
 def evidence_links(anomaly: Anomaly) -> list[dict]:
-    """Attach a 'Toon factuurpagina' link to every evidence item that points at a PDF page."""
+    """Evidence items with stable ids, and a link to the source page where one exists."""
     out = []
-    for e in anomaly.evidence or []:
+    for n, e in enumerate(anomaly.evidence or []):
         item = dict(e)
+        item["id"] = f"ev{n}"
+        item["box_id"] = f"hl{n}" if e.get("bbox") and e.get("page") else None
         if e.get("document_id") and e.get("page"):
             hl = ",".join(str(v) for v in e["bbox"]) if e.get("bbox") else ""
             item["page_url"] = (f"/app/documents/{e['document_id']}/view/{e['page']}?hl={hl}"
@@ -60,18 +64,54 @@ def evidence_links(anomaly: Anomaly) -> list[dict]:
     return out
 
 
+EV_ICON = {"invoice_line": "row", "invoice_field": "invoice", "contract_price": "contract", "meter_reading": "meter",
+           "reference_rate": "rate"}
+
+
+def source_view(db: Session, user: User, evidence: list[dict], doc_id: str | None = None,
+                page: int | None = None) -> dict | None:
+    """Pick the document page to show next to the analysis and the regions to highlight on it."""
+    candidates = [e for e in evidence if e.get("document_id")]
+    if not candidates:
+        return None
+    if doc_id is None:
+        with_page = [e for e in candidates if e.get("page")]
+        first = (with_page or candidates)[0]
+        doc_id, page = first["document_id"], first.get("page")
+    doc = db.get(Document, doc_id)
+    if doc is None or not can_access_client(user, doc.client_id):
+        return None
+    sizes = ensure_page_sizes(db, doc)
+    page = page or 1
+    view = {"doc": doc, "page": page, "size": None, "boxes": [], "rows": []}
+    if sizes and 1 <= page <= len(sizes):
+        view["size"] = sizes[page - 1]
+        for e in evidence:
+            if e.get("document_id") == doc.id and e.get("page") == page and e.get("box_id"):
+                box = box_for(e.get("bbox"), e["box_id"], label=e.get("label", ""))
+                if box:
+                    view["boxes"].append(box)
+    else:
+        view["rows"] = [e for e in evidence if e.get("document_id") == doc.id and e.get("source_text")]
+    return view
+
+
 @router.get("/app/anomalies/{anomaly_id}")
-def anomaly_detail(anomaly_id: str, request: Request, user: User = Depends(require_user),
-                   db: Session = Depends(get_db)):
+def anomaly_detail(anomaly_id: str, request: Request, doc: str | None = None, page: int | None = None,
+                   user: User = Depends(require_user), db: Session = Depends(get_db)):
     a = get_owned(db, Anomaly, anomaly_id, user)
     if not user.is_staff and a.review_status != ReviewStatus.CONFIRMED:
-        return render(request, "error.html", status_code=404, title="Niet gevonden")
+        raise HTTPException(status_code=404)
     siblings = []
     if user.is_staff and a.invoice_id:
         siblings = db.scalars(select(Anomaly).where(Anomaly.invoice_id == a.invoice_id, Anomaly.id != a.id,
                                                     Anomaly.is_stale.is_(False))).all()
+    evidence = evidence_links(a)
+    audit(db, "anomaly.viewed", user=user, client_id=a.client_id, object_type="anomaly", object_id=a.id)
+    db.commit()
     return render(request, "review/detail.html", user=user, a=a, client=db.get(Client, a.client_id),
-                  evidence=evidence_links(a), siblings=siblings)
+                  evidence=evidence, source=source_view(db, user, evidence, doc, page), siblings=siblings,
+                  ev_icon=EV_ICON, v=finding_view(a))
 
 
 @router.post("/app/anomalies/{anomaly_id}/review", dependencies=[Depends(verify_csrf)])

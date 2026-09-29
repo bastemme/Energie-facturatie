@@ -21,6 +21,7 @@ class Document(IdMixin, TimestampMixin, Base):
     doc_type_confidence: Mapped[float | None] = mapped_column(Float)
     status: Mapped[DocumentStatus] = mapped_column(enum_type(DocumentStatus), default=DocumentStatus.UPLOADED)
     page_count: Mapped[int | None] = mapped_column(Integer)
+    page_sizes: Mapped[list | None] = mapped_column(JSON)  # [[width, height], ...] in PDF points
     extraction_confidence: Mapped[float | None] = mapped_column(Float)
     processing_error: Mapped[str | None] = mapped_column(Text)
     processing_notes: Mapped[list | None] = mapped_column(JSON)  # human-readable validation notes

@@ -71,9 +71,10 @@ def login(client, email):
 def test_landing_page(app_client):
     r = app_client.get("/")
     assert r.status_code == 200
-    assert "Betaalt uw bedrijf te veel voor energie?" in r.text
+    assert "Vind fouten in uw energiefacturen" in r.text and "No cure, no pay" in r.text
     assert "Laat mijn energiefacturen controleren" in r.text and "Bekijk hoe het werkt" in r.text
-    assert "Fictief voorbeeld" in r.text
+    assert "fictieve gegevens" in r.text and "Fictief voorbeeld" in r.text
+    assert "fonts.googleapis" not in r.text  # fonts are self-hosted (no visitor data to third parties)
     assert "default-src 'self'" in r.headers["content-security-policy"]
     assert r.headers["x-frame-options"] == "DENY"
 
@@ -162,7 +163,7 @@ def test_end_to_end_recovery_workflow(app_client):
     assert r.status_code == 200 and "1 document(en) verwerkt" in r.text
 
     r = app_client.post(f"/app/clients/{client_id}/analyse", data={"csrf_token": token})
-    assert "Analyse uitgevoerd" in r.text
+    assert "Analyse afgerond" in r.text
 
     with session() as s:
         a = s.scalar(select(Anomaly).where(Anomaly.rule_id == "contract_price"))
@@ -170,11 +171,20 @@ def test_end_to_end_recovery_workflow(app_client):
         anomaly_id = a.id
         doc_id = s.scalar(select(Document.id))
 
-    # finding detail shows evidence with "Toon factuurpagina", page renders as PNG with highlight
+    # invoice analysis view shows the same document with the flagged line highlighted
+    with session() as s:
+        inv_id = s.scalar(select(Invoice.id))
+    r = app_client.get(f"/app/invoices/{inv_id}")
+    assert r.status_code == 200 and 'class="hl"' in r.text and "Uitgelezen regels" in r.text
+    assert app_client.get(f"/app/invoices/{inv_id}/edit").status_code == 200
+
+    # finding detail: split view with the source page and a highlight overlay linked to the evidence
     r = app_client.get(f"/app/anomalies/{anomaly_id}")
-    assert "Toon factuurpagina" in r.text and "Mogelijke discrepantie" in r.text
-    link = re.search(r'href="(/app/documents/[^"]+/view/1\?hl=[^"]+)"', r.text).group(1).replace("&amp;", "&")
-    assert app_client.get(link).status_code == 200
+    assert "Mogelijke discrepantie" in r.text and "€ 50,00" in r.text
+    assert f'/app/documents/{doc_id}/page/1.png' in r.text
+    assert re.search(r'<rect id="hl0" class="hl"', r.text) and 'data-hl="hl0"' in r.text
+    for step in ("Bron", "Analyse", "Berekening", "Conclusie"):
+        assert f'class="step-label">{step}<' in r.text
     png = app_client.get(f"/app/documents/{doc_id}/page/1.png?hl=50,240,540,260")
     assert png.status_code == 200 and png.content.startswith(b"\x89PNG")
 
@@ -231,6 +241,9 @@ def test_end_to_end_recovery_workflow(app_client):
     assert r.status_code == 200 and r.content.startswith(b"%PDF")
     r = app_client.get("/app/admin")
     assert "Teruggevorderd per 1.000 facturen" in r.text and "€ 50,00" in r.text
+    assert '<svg class="chart"' in r.text  # monthly chart rendered server-side
+    r = app_client.get(f"/app/clients/{client_id}?tab=overzicht")
+    assert "Terugvordering" in r.text and "Factuurwaarde per maand" in r.text
 
     # audit trail contains the decisions, without amounts
     with session() as s:
@@ -249,8 +262,8 @@ def test_invoice_manual_correction_and_verification(app_client):
     with session() as s:
         inv = s.scalar(select(Invoice))
         inv_id, line_id = inv.id, inv.lines[0].id
-    page = app_client.get(f"/app/invoices/{inv_id}").text
-    assert "REGEX" in page
+    page = app_client.get(f"/app/invoices/{inv_id}/edit").text
+    assert "uit PDF" in page
     form = {"csrf_token": token, "supplier": "Eneco", "invoice_number": "2026-0001", "invoice_type": "INVOICE",
             "invoice_date": "31-01-2026", "billing_period_start": "01-01-2026", "billing_period_end": "31-01-2026",
             "commodity": "ELECTRICITY", f"line-{line_id}-description": "Levering normaal",
@@ -402,3 +415,41 @@ def test_unicode_filename_download_and_no_state_change_on_get(app_client):
     assert r.headers["x-content-type-options"] == "nosniff"
     assert app_client.get(f"/app/invoices/new?client_id={client_id}").status_code in (404, 405)
     assert app_client.post("/app/invoices/new", data={"client_id": client_id}).status_code == 403  # no CSRF
+
+
+def test_upload_json_processing_flow(app_client):
+    make_user("admin@op.nl", Role.ADMIN)
+    client_id = make_client()
+    login(app_client, "admin@op.nl")
+    token = csrf(app_client, f"/app/clients/{client_id}?tab=documenten")
+    files = [("files", ("a.pdf", render_invoice_pdf(electricity_invoice(normal_amount=Decimal("300"))), "application/pdf")),
+             ("files", ("b.exe", b"MZ", "application/octet-stream"))]
+    r = app_client.post(f"/app/clients/{client_id}/upload", data={"csrf_token": token}, files=files,
+                        headers={"Accept": "application/json"})
+    data = r.json()
+    assert data["can_analyse"] is True
+    ok, bad = data["files"]
+    assert ok["ok"] and ok["invoices"] == 1 and ok["lines"] == 3
+    assert not bad["ok"] and "niet toegestaan" in bad["message"]
+    r = app_client.post(f"/app/clients/{client_id}/analyse", data={"csrf_token": token},
+                        headers={"Accept": "application/json"})
+    res = r.json()
+    assert res["findings_new"] >= 1 and res["rules"] >= 10
+
+
+def test_human_readable_errors_and_empty_states(app_client):
+    make_user("admin@op.nl", Role.ADMIN)
+    client_id = make_client()
+    login(app_client, "admin@op.nl")
+    r = app_client.get("/app/clients/does-not-exist")
+    assert r.status_code == 404 and "Deze pagina bestaat niet" in r.text and "Naar het overzicht" in r.text
+    r = app_client.get(f"/app/clients/{client_id}")
+    assert "Nog geen facturen" in r.text and "Upload de eerste energiefactuur" in r.text
+    assert "Niets te beoordelen" in app_client.get("/app/review").text
+    assert app_client.get("/app/designsysteem").status_code == 200
+
+
+def test_static_assets_served(app_client):
+    assert app_client.get("/static/app.js").status_code == 200
+    r = app_client.get("/static/fonts/instrument-sans-latin-wght-normal.woff2")
+    assert r.status_code == 200 and len(r.content) > 10000

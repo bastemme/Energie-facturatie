@@ -535,3 +535,11 @@ def test_one_day_boundary_differences_ignored(db, client):
     add_invoice(db, client, "X3", date(2026, 3, 3), date(2026, 3, 31), [line(C.FIXED_SUPPLY_FEE, 1, "month", "7.50")])
     assert findings(db, client, "billing_period_overlap") == []
     assert findings(db, client, "billing_period_gap") == []  # 1-day gap (02-03) tolerated
+
+
+def test_explanations_keep_invoice_number_case(db, client):
+    inv = add_invoice(db, client, "DEMO-4", *JAN, [line(C.ELECTRICITY_NORMAL, 1500, "kWh", "0.20")])
+    add_reading(db, client, JAN[0], 1000, invoice=inv)
+    add_reading(db, client, JAN[1], 2000, invoice=inv, rtype=ReadingType.ESTIMATED)
+    [e] = findings(db, client, "estimated_reading")
+    assert e.description.startswith("Factuur DEMO-4")

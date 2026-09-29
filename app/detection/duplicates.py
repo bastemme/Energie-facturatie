@@ -13,6 +13,7 @@ from app.detection.base import (
     invoice_field_evidence,
     invoice_ref,
     line_evidence,
+    upper_first,
 )
 from app.domain.confidence import EvidenceQuality, confidence_from_evidence
 from app.domain.enums import Classification, Confidence
@@ -111,7 +112,7 @@ def detect_billed_twice(ctx: AnalysisContext) -> list[Finding]:
                 confidence=confidence_from_evidence([EvidenceQuality.DERIVED]),
                 title=f"Mogelijk dubbel gefactureerd: {original.label} en {dup.label}",
                 description=(
-                    f"{invoice_ref(dup).capitalize()} heeft dezelfde aansluiting ({dup.ean}), dezelfde periode en "
+                    f"{upper_first(invoice_ref(dup))} heeft dezelfde aansluiting ({dup.ean}), dezelfde periode en "
                     f"hetzelfde totaalbedrag ({eur(dup.total_incl_vat)}) als {invoice_ref(original)}, maar een ander "
                     f"factuurnummer. Mogelijke discrepantie: {eur(recovery)} excl. btw. Verificatie vereist: "
                     "controleer of beide facturen zijn betaald en of er geen creditnota tegenover staat."

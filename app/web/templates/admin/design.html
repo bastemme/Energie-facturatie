@@ -1,0 +1,78 @@
+{% extends "app_base.html" %}
+{% block title %}Designsysteem{% endblock %}
+{% block content %}
+<div class="page">
+  {{ ui.page_head('Designsysteem', 'De bouwstenen van ' ~ operator_name ~ '. Zie ook docs/design-system.md.') }}
+
+  <section class="panel">
+    <div class="panel-head"><h2>Kleur: alleen met betekenis</h2></div>
+    <div class="panel-body stack">
+      <div class="row"><span class="chip brand">Merk: interactie</span><span class="chip positive">Groen: bevestigd, teruggevorderd</span><span class="chip review">Amber: vereist beoordeling</span><span class="chip critical">Rood: fout, kritiek</span><span class="chip neutral">Neutraal: informatie</span></div>
+      <p class="small muted">Kleur is nooit decoratie. Statuskleur gaat altijd samen met een label.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Typografie: Instrument Sans en Geist Mono</h2></div>
+    <div class="panel-body stack">
+      <div class="figure-inline">€ 48.211,40</div><p class="small muted">Heldencijfer: 600, tabelcijfers, −3,5% spatiëring</p>
+      <h1>Kop 1: paginatitel</h1><h2>Kop 2: sectie</h2><h3>Kop 3: paneel</h3>
+      <p>Lopende tekst, 15px, regelhoogte 1,55. Maximaal circa 70 tekens per regel.</p>
+      <p class="small muted">Metadata en toelichting, 13px</p>
+      <span class="label">Label, 11px hoofdletters</span>
+      <span><span class="tag">871687000000000421</span> identificatiecodes in Geist Mono</span>
+    </div>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head"><h2>Knoppen</h2></div>
+      <div class="panel-body stack">
+        <div class="actions"><button class="btn btn-primary" type="button">Primair</button><button class="btn" type="button">Secundair</button><button class="btn btn-ghost" type="button">Stil</button></div>
+        <div class="actions"><button class="btn btn-positive btn-sm" type="button">{{ icon('check') }}Bevestigen</button><button class="btn btn-danger btn-sm" type="button">Afwijzen</button><button class="btn btn-sm is-loading" type="button">Bezig</button></div>
+        <p class="small muted">Eén primaire knop per scherm. Werkwoord in de knop: zeg wat er gebeurt.</p>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Invoer</h2></div>
+      <div class="panel-body stack">
+        <div class="field"><label for="ds-in">Veld met label</label><input id="ds-in" type="text" placeholder="Voorbeeldtekst"><span class="hint">Hulptekst onder het veld</span></div>
+        <label class="check"><input type="checkbox" checked><span>Selectievakje met uitleg</span></label>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head"><h2>Status en zekerheid</h2></div>
+      <div class="panel-body stack">
+        <div class="row">{{ ui.chip('Mogelijke discrepantie', 'review') }}{{ ui.chip('Afwijking', 'neutral') }}{{ ui.chip('Bevestigd', 'positive') }}{{ ui.chip('Betwist', 'critical') }}</div>
+        <div class="row">{{ ui.conf(Confidence.HIGH) }}{{ ui.conf(Confidence.MEDIUM) }}{{ ui.conf(Confidence.LOW) }}</div>
+        <p class="small muted">Zekerheid volgt uit de kwaliteit van het bewijs, niet uit een model. Beweeg over de balkjes voor uitleg.</p>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Meldingen</h2></div>
+      <div class="panel-body stack">
+        <div class="alert info">{{ icon('info') }}<span>Informatie of uitleg.</span></div>
+        <div class="alert review">{{ icon('alert') }}<span>Vereist aandacht of verificatie.</span></div>
+        <div class="alert positive">{{ icon('check-circle') }}<span>Gelukt of bevestigd.</span></div>
+        <div class="alert critical">{{ icon('x-circle') }}<span><b>Wat er misging.</b> En wat de gebruiker nu kan doen.</span></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Het spoor</h2><p>Het terugkerende motief: van bron naar conclusie.</p></div>
+    <div class="panel-body grid-2">
+      <ol class="spoor"><li><span class="node on"></span><div class="step-label">Bron</div><p>Factuurregel, pagina 1</p></li><li><span class="node on"></span><div class="step-label">Analyse</div><p>Tarief wijkt af van contract</p></li><li><span class="node on"></span><div class="step-label">Berekening</div><p class="num">1.000 kWh × € 0,05 = € 50,00</p></li><li><span class="node done"></span><div class="step-label">Conclusie</div><p>Bevestigd</p></li></ol>
+      <ol class="pipeline"><li class="done"><div class="p-name">Beoordeling</div></li><li class="done"><div class="p-name">Ingediend</div></li><li class="current"><div class="p-name">Bij leverancier</div></li><li class="todo"><div class="p-name">Teruggevorderd</div></li></ol>
+    </div>
+  </section>
+
+  <section class="panel">
+    {% call ui.empty('upload', 'Lege staat', 'Zeg wat hier komt te staan en wat de gebruiker moet doen. Nooit alleen "Geen data".') %}<button class="btn btn-primary" type="button" data-dialog-open="ds-dialog">Dialoog openen</button>{% endcall %}
+  </section>
+  <dialog id="ds-dialog" aria-labelledby="ds-title"><form method="dialog"><div class="dialog-head"><h2 id="ds-title">Dialoog</h2><p>Voor bevestigingen en korte formulieren. Sluit met Esc.</p></div><div class="dialog-body"><div class="skeleton"><div class="sheet skeleton"></div></div></div><div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Sluiten</button></div></form></dialog>
+</div>
+{% endblock %}

@@ -4,16 +4,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.domain.enums import DocumentStatus, LeadStatus, RateKind, Role
-from app.models import AnalysisRun, AuditLog, Client, Document, Lead, ReferenceRate, User
+from app.domain.enums import DocumentStatus, LeadStatus, RateKind, ReviewStatus, Role
+from app.models import AnalysisRun, Anomaly, AuditLog, Client, Document, Lead, ReferenceRate, User
 from app.models.base import utcnow
 from app.services.audit import audit
 from app.services.metrics import operator_metrics, summary
 from app.web.deps import flash, form_date, form_decimal, redirect, render
 from app.web.security import hash_password, require_admin, require_staff, verify_csrf
+from app.web.view import bar_chart, category_distribution, monthly_series, pipeline_stages
 
 router = APIRouter()
 
@@ -22,15 +23,29 @@ router = APIRouter()
 def admin_dashboard(request: Request, user: User = Depends(require_staff), db: Session = Depends(get_db)):
     problem_docs = db.scalars(select(Document).where(Document.status.in_(
         [DocumentStatus.NEEDS_REVIEW, DocumentStatus.NEEDS_OCR, DocumentStatus.FAILED]))
-        .order_by(Document.created_at.desc()).limit(25)).all()
-    failed_runs = db.scalars(select(AnalysisRun).where(AnalysisRun.errors.is_not(None))
-                             .order_by(AnalysisRun.created_at.desc()).limit(10)).all()
+        .order_by(Document.created_at.desc()).limit(8)).all()
+    failed_runs = [r for r in db.scalars(select(AnalysisRun).where(AnalysisRun.errors.is_not(None))
+                                         .order_by(AnalysisRun.created_at.desc()).limit(10)).all() if r.errors]
     clients = db.scalars(select(Client).order_by(Client.company_name)).all()
-    return render(request, "admin/dashboard.html", user=user, s=summary(db), m=operator_metrics(db),
-                  problem_docs=problem_docs, failed_runs=[r for r in failed_runs if r.errors],
-                  clients={c.id: c for c in clients},
-                  client_rows=[(c, summary(db, c.id)) for c in clients],
-                  new_leads=db.scalars(select(Lead).where(Lead.status == LeadStatus.NEW)).all())
+    anomalies = db.scalars(select(Anomaly).where(Anomaly.is_stale.is_(False))
+                           .options(selectinload(Anomaly.invoice))).all()
+    queue = sorted([a for a in anomalies if a.review_status in (ReviewStatus.OPEN, ReviewStatus.INVESTIGATING,
+                                                                ReviewStatus.INFO_REQUESTED)],
+                   key=lambda a: -a.potential_recovery)
+    s = summary(db)
+    series = monthly_series(db, None)
+    return render(request, "admin/dashboard.html", user=user, s=s, m=operator_metrics(db), problem_docs=problem_docs,
+                  failed_runs=failed_runs, clients={c.id: c for c in clients},
+                  client_rows=[(c, summary(db, c.id)) for c in clients], queue=queue[:4], queue_total=len(queue),
+                  stages=pipeline_stages(s), distribution=category_distribution(anomalies),
+                  bar=bar_chart(series) if series else None,
+                  new_leads=db.scalars(select(Lead).where(Lead.status == LeadStatus.NEW)
+                                       .order_by(Lead.created_at.desc())).all())
+
+
+@router.get("/app/designsysteem")
+def design_system(request: Request, user: User = Depends(require_staff)):
+    return render(request, "admin/design.html", user=user)
 
 
 @router.get("/app/reference-rates")

@@ -1,22 +1,23 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import conf, cls, rstatus with context %}
 {% block title %}Beoordelen{% endblock %}
 {% block content %}
-<h1>Beoordelingswachtrij</h1>
-<form method="get" action="/app/review" class="card"><div class="form-row">
-  <div><label>Klant</label><select name="client_id"><option value="">Alle</option>{% for c in clients.values() %}<option value="{{ c.id }}" {% if filters.client_id == c.id %}selected{% endif %}>{{ c.company_name }}</option>{% endfor %}</select></div>
-  <div><label>Status</label><select name="status"><option value="">Openstaand</option>{% for s in ReviewStatus %}<option value="{{ s.value }}" {% if filters.status == s.value %}selected{% endif %}>{{ REVIEW_LABELS[s] }}</option>{% endfor %}</select></div>
-  <div><label>Zekerheid</label><select name="confidence"><option value="">Alle</option>{% for c in ['HIGH','MEDIUM','LOW'] %}<option {% if filters.confidence == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
-  <div><label>Type</label><select name="classification"><option value="">Alle</option><option value="POTENTIAL_ERROR" {% if filters.classification == 'POTENTIAL_ERROR' %}selected{% endif %}>Mogelijke fout</option><option value="ANOMALY" {% if filters.classification == 'ANOMALY' %}selected{% endif %}>Afwijking</option></select></div>
-  <div><label>Regel</label><select name="rule"><option value="">Alle</option>{% for r in rules %}<option {% if filters.rule == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></div>
-</div><div class="actions mt"><button class="btn secondary" type="submit">Filteren</button></div></form>
-<p class="muted">{{ items|length }} bevindingen · mogelijke waarde (niet dubbel geteld): <strong>{{ total|eur }}</strong></p>
-<div class="table-wrap"><table>
-  <tr><th>Klant</th><th>Factuur</th><th>Bevinding</th><th>Type</th><th>Zekerheid</th><th>Status</th><th class="num">Mogelijk</th></tr>
-  {% for a in items %}
-  <tr><td>{{ clients[a.client_id].company_name if a.client_id in clients else '' }}</td><td>{{ a.invoice.label if a.invoice else '—' }}</td>
-    <td><a href="/app/anomalies/{{ a.id }}">{{ a.title }}</a><br><span class="small muted">{{ a.rule_id }} v{{ a.rule_version }}</span></td>
-    <td>{{ cls(a.classification) }}</td><td>{{ conf(a.confidence) }}</td><td>{{ rstatus(a.review_status) }}</td><td class="num">{{ a.potential_recovery|eur }}</td></tr>
-  {% else %}<tr><td colspan="7" class="muted">Geen bevindingen voor deze selectie.</td></tr>{% endfor %}
-</table></div>
+<div class="page">
+  {{ ui.page_head('Beoordelen', 'Gesorteerd op mogelijke terugvordering. Een bevinding telt pas als vordering na uw bevestiging.') }}
+  <form method="get" action="/app/review" class="panel panel-pad" data-no-loading>
+    <div class="fields">
+      <div class="field"><label for="q-client">Klant</label><select id="q-client" name="client_id"><option value="">Alle klanten</option>{% for c in clients.values() %}<option value="{{ c.id }}" {% if filters.client_id == c.id %}selected{% endif %}>{{ c.company_name }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="q-status">Status</label><select id="q-status" name="status"><option value="">Openstaand</option>{% for s in ReviewStatus %}<option value="{{ s.value }}" {% if filters.status == s.value %}selected{% endif %}>{{ REVIEW_LABELS[s] }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="q-conf">Zekerheid</label><select id="q-conf" name="confidence"><option value="">Alle</option>{% for c, l in [('HIGH','Hoog'),('MEDIUM','Middel'),('LOW','Laag')] %}<option value="{{ c }}" {% if filters.confidence == c %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="q-type">Soort</label><select id="q-type" name="classification"><option value="">Alle</option><option value="POTENTIAL_ERROR" {% if filters.classification == 'POTENTIAL_ERROR' %}selected{% endif %}>Mogelijke discrepantie</option><option value="ANOMALY" {% if filters.classification == 'ANOMALY' %}selected{% endif %}>Afwijking</option></select></div>
+      <div class="field"><label for="q-rule">Controleregel</label><select id="q-rule" name="rule"><option value="">Alle</option>{% for r in rules %}<option {% if filters.rule == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="row-between mt-s"><span class="small muted">{{ items|length }} bevindingen · mogelijke waarde <b class="num">{{ total|eur }}</b></span><div class="actions"><a class="btn btn-ghost btn-sm" href="/app/review">Wissen</a><button class="btn btn-sm" type="submit">Toepassen</button></div></div>
+  </form>
+  {% if items %}
+  <div class="findings">{% for a in items %}{{ ui.finding_card(a, request.url.path ~ ('?' ~ request.url.query if request.url.query else ''), clients.get(a.client_id)) }}{% endfor %}</div>
+  {% else %}
+  <div class="panel">{{ ui.empty('check-circle', 'Niets te beoordelen', 'Er zijn geen bevindingen voor deze selectie. Pas de filters aan of voer een nieuwe analyse uit bij een klant.') }}</div>
+  {% endif %}
+  {{ ui.review_dialog(request.url.path) }}
+</div>
 {% endblock %}

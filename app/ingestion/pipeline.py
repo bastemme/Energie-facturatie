@@ -124,6 +124,7 @@ def _clear_previous_extraction(db: Session, doc: Document) -> None:
 def _process_pdf(db: Session, doc: Document, content: bytes, declared_type: DocumentType | None) -> None:
     pdf = read_pdf(content)
     doc.page_count = pdf.page_count
+    doc.page_sizes = [list(s) for s in pdf.page_sizes]
     if not pdf.has_text_layer:
         doc.doc_type = declared_type or DocumentType.UNKNOWN
         doc.status = DocumentStatus.NEEDS_OCR

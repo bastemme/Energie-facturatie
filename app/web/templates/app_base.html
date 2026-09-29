@@ -1,36 +1,64 @@
-{% from "_macros.html" import csrf_field with context %}
+{% import "_ui.html" as ui with context %}
 <!doctype html>
 <html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<meta name="csrf-token" content="{{ csrf }}">
 <title>{% block title %}Portaal{% endblock %} · {{ operator_name }}</title>
+<link rel="preload" href="/static/fonts/instrument-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
 </head>
 <body>
-<header class="topbar"><div class="container">
-  <a class="brand" href="/app">{{ operator_name }}</a>
-  {% if user %}
-  <nav class="nav">
-    {% if user.is_staff %}
-      <a href="/app/admin">Overzicht</a>
-      <a href="/app/clients">Klanten</a>
-      <a href="/app/review">Beoordelen</a>
-      <a href="/app/cases">Dossiers</a>
-      <a href="/app/leads">Leads</a>
-      <a href="/app/reference-rates">Referentietarieven</a>
-      {% if user.role.value == 'ADMIN' %}<a href="/app/users">Gebruikers</a><a href="/app/audit">Auditlog</a>{% endif %}
-    {% else %}
-      <a href="/app/clients/{{ user.client_id }}">Mijn overzicht</a>
-    {% endif %}
-    <form method="post" action="/logout">{{ csrf_field() }}<button type="submit">Uitloggen</button></form>
-  </nav>
-  {% endif %}
-</div></header>
-<main><div class="container">
-  {% for m in messages %}<div class="flash {{ m.kind }}">{{ m.message }}</div>{% endfor %}
-  {% block content %}{% endblock %}
-</div></main>
+{% if user %}
+{% macro navlink(href, label, ico, match=None, count=None, attention=False) %}{% set m = match or href %}<a href="{{ href }}"{% if path == href or (m != '/app' and path.startswith(m)) %} aria-current="page"{% endif %}>{{ icon(ico) }}{{ label }}{% if count %}<span class="count{{ ' attention' if attention }}">{{ count }}</span>{% endif %}</a>{% endmacro %}
+<div class="shell">
+  <aside class="sidebar" aria-label="Hoofdnavigatie">
+    <a class="logo" href="/app">{{ LOGO }}<span>{{ operator_name }}</span></a>
+    <nav class="nav">
+      {% if user.is_staff %}
+      <div class="nav-group">
+        {{ navlink('/app/admin', 'Overzicht', 'overview') }}
+        {{ navlink('/app/review', 'Beoordelen', 'review', count=queue_count, attention=queue_count > 0) }}
+        {{ navlink('/app/cases', 'Dossiers', 'cases') }}
+        {{ navlink('/app/clients', 'Klanten', 'clients') }}
+      </div>
+      <div class="nav-group">
+        <span class="nav-title">Groei</span>
+        {{ navlink('/app/leads', 'Leads', 'leads') }}
+      </div>
+      <div class="nav-group">
+        <span class="nav-title">Beheer</span>
+        {{ navlink('/app/reference-rates', 'Referentietarieven', 'rate') }}
+        {% if user.role.value == 'ADMIN' %}{{ navlink('/app/users', 'Gebruikers', 'users') }}{{ navlink('/app/audit', 'Auditlog', 'audit') }}{% endif %}
+        {{ navlink('/app/designsysteem', 'Designsysteem', 'design') }}
+      </div>
+      {% else %}
+      <div class="nav-group">
+        {{ navlink('/app/clients/' ~ user.client_id, 'Overzicht', 'overview') }}
+      </div>
+      {% endif %}
+    </nav>
+    <div class="sidebar-foot">
+      <div class="me"><span class="avatar">{{ (user.full_name or user.email)[:1]|upper }}</span><span class="me-text"><b>{{ user.full_name or user.email }}</b><span>{{ {'ADMIN':'Beheerder','REVIEWER':'Beoordelaar','CLIENT':'Klant'}[user.role.value] }}</span></span></div>
+      <form method="post" action="/logout" class="nav">{{ ui.csrf_field() }}<button type="submit">{{ icon('logout') }}Uitloggen</button></form>
+    </div>
+  </aside>
+  <div class="main-col">
+    <div class="topbar">
+      <a class="logo" href="/app">{{ LOGO }}<span>{{ operator_name }}</span></a>
+      <button class="btn btn-ghost btn-sm" type="button" data-menu aria-expanded="false" aria-label="Menu openen">{{ icon('menu') }}</button>
+    </div>
+    <main class="main" id="main">{% block content %}{% endblock %}</main>
+  </div>
+</div>
+{% else %}
+<main id="main">{% block bare %}{% endblock %}</main>
+{% endif %}
+<div class="toasts" role="status" aria-live="polite">
+  {% for m in messages %}<div class="toast {{ 'success' if m.kind == 'success' else ('error' if m.kind == 'error' else 'info') }}">{{ icon('check-circle' if m.kind == 'success' else ('x-circle' if m.kind == 'error' else 'info')) }}<span>{{ m.message }}</span><button class="close" type="button" aria-label="Sluiten">×</button></div>{% endfor %}
+</div>
 </body>
 </html>

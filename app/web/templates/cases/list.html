@@ -1,12 +1,21 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import cstatus with context %}
 {% block title %}Dossiers{% endblock %}
 {% block content %}
-<h1>Terugvorderingsdossiers</h1>
-<form method="get" class="actions mb"><select name="status"><option value="">Alle statussen</option>{% for s in CaseStatus %}<option value="{{ s.value }}" {% if status == s.value %}selected{% endif %}>{{ CASE_LABELS[s] }}</option>{% endfor %}</select><button class="btn small secondary" type="submit">Filteren</button></form>
-<div class="table-wrap"><table>
-  <tr><th>Dossier</th><th>Klant</th><th>Leverancier</th><th>Status</th><th class="num">Geclaimd</th><th class="num">Toegekend</th><th class="num">Teruggevorderd</th><th class="num">Fee</th></tr>
-  {% for c in cases %}<tr><td><a href="/app/cases/{{ c.id }}">{{ c.reference }}</a></td><td>{{ clients[c.client_id].company_name }}</td><td>{{ c.supplier }}</td><td>{{ cstatus(c.status) }}</td><td class="num">{{ c.disputed_amount|eur }}</td><td class="num">{{ c.confirmed_amount|eur }}</td><td class="num">{{ c.recovered_amount|eur }}</td><td class="num">{{ c.success_fee|eur }}</td></tr>
-  {% else %}<tr><td colspan="8" class="muted">Geen dossiers.</td></tr>{% endfor %}
-</table></div>
+<div class="page">
+  {{ ui.page_head('Dossiers', 'Correctieverzoeken per leverancier, van beoordeling tot ontvangen bedrag.') }}
+  <nav class="tabs" aria-label="Filter op status">
+    <a href="/app/cases"{% if not status %} aria-current="page"{% endif %}>Alle</a>
+    {% for s, l in [('REVIEW','In beoordeling'),('SUBMITTED','Ingediend'),('SUPPLIER_REVIEW','Bij leverancier'),('APPROVED','Toegekend'),('RECOVERED','Teruggevorderd'),('DISPUTED','Betwist')] %}<a href="/app/cases?status={{ s }}"{% if status == s %} aria-current="page"{% endif %}>{{ l }}</a>{% endfor %}
+  </nav>
+  <section class="panel">
+    {% if cases %}
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Dossier</th><th>Status</th><th class="r">Geclaimd</th><th class="r">Toegekend</th><th class="r">Teruggevorderd</th><th class="r">Fee</th></tr></thead>
+      <tbody>{% for c in cases %}<tr><td><a class="primary" href="/app/cases/{{ c.id }}">{{ c.reference }}</a><span class="sub">{{ clients[c.client_id].company_name }} · {{ c.supplier }}</span></td>
+        <td data-label="Status">{{ ui.case_chip(c.status) }}</td><td class="r num" data-label="Geclaimd">{{ c.disputed_amount|eur }}</td><td class="r num" data-label="Toegekend">{{ c.confirmed_amount|eur }}</td>
+        <td class="r num" data-label="Teruggevorderd"><b>{{ c.recovered_amount|eur }}</b></td><td class="r num" data-label="Fee">{{ c.success_fee|eur }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{{ ui.empty('cases', 'Geen dossiers' ~ (' met deze status' if status else ''), 'Maak een dossier vanuit de bevestigde bevindingen van een klant.') }}{% endif %}
+  </section>
+</div>
 {% endblock %}

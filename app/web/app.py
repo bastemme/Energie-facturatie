@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -17,6 +18,24 @@ from app.web.security import LoginRequired
 
 CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
        "form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'")
+
+
+def _user_or_none(request: Request):
+    """Best-effort user lookup for error pages (never raises)."""
+    try:
+        from app.db import session_factory
+        from app.models import User
+
+        uid = request.session.get("uid")
+        if not uid:
+            return None
+        with session_factory()() as db:
+            user = db.get(User, uid)
+            if user is not None:
+                db.expunge(user)
+            return user
+    except Exception:
+        return None
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
@@ -56,10 +75,22 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
     @app.exception_handler(HTTPException)
     async def _http_error(request: Request, exc: HTTPException):
-        titles = {403: "Geen toegang", 404: "Niet gevonden", 413: "Bestand te groot"}
-        return render(request, "error.html", status_code=exc.status_code,
-                      title=titles.get(exc.status_code, "Er ging iets mis"), detail=exc.detail
-                      if exc.status_code != 404 else None)
+        titles = {403: "Hier heeft u geen toegang toe", 404: "Deze pagina bestaat niet",
+                  413: "Het bestand is te groot", 405: "Deze actie is hier niet mogelijk"}
+        detail = exc.detail if exc.status_code not in (404, 405) and isinstance(exc.detail, str) else None
+        if exc.status_code == 403 and detail in (None, "Forbidden"):
+            detail = "Uw account heeft geen rechten voor deze pagina. Denkt u dat dit niet klopt? Neem contact op."
+        return render(request, "error.html", status_code=exc.status_code, ico="lock" if exc.status_code == 403
+                      else "search", title=titles.get(exc.status_code, "Er ging iets mis"), detail=detail,
+                      user=_user_or_none(request))
+
+    @app.exception_handler(Exception)
+    async def _server_error(request: Request, exc: Exception):
+        logging.getLogger("app").exception("unhandled error on %s", request.url.path)
+        return render(request, "error.html", status_code=500, ico="alert", title="Er ging iets mis aan onze kant",
+                      detail="Uw gegevens zijn niet gewijzigd. Probeer het over een ogenblik opnieuw; blijft het "
+                             "misgaan, neem dan contact met ons op.", retry=str(request.url.path),
+                      user=_user_or_none(request))
 
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 

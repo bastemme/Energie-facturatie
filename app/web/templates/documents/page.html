@@ -1,12 +1,12 @@
 {% extends "app_base.html" %}
-{% block title %}Factuurpagina{% endblock %}
+{% block title %}{{ doc.original_filename }} · pagina {{ page }}{% endblock %}
 {% block content %}
-<p class="small"><a href="/app/documents/{{ doc.id }}">← {{ doc.original_filename }}</a></p>
-<h1>{{ doc.original_filename }} — pagina {{ page }}</h1>
-{% if label %}<p class="notice info">Gemarkeerd: {{ label }}</p>{% endif %}
-<div class="actions mb">
-  {% if page > 1 %}<a class="btn small secondary" href="/app/documents/{{ doc.id }}/view/{{ page - 1 }}">← Vorige</a>{% endif %}
-  {% if not doc.page_count or page < doc.page_count %}<a class="btn small secondary" href="/app/documents/{{ doc.id }}/view/{{ page + 1 }}">Volgende →</a>{% endif %}
+<div class="page">
+  {% call ui.page_head(doc.original_filename, 'Pagina ' ~ page ~ ((' van ' ~ doc.page_count) if doc.page_count else ''), [('Document', '/app/documents/' ~ doc.id)]) %}
+    <nav class="pager" aria-label="Pagina's">{% if page > 1 %}<a href="/app/documents/{{ doc.id }}/view/{{ page - 1 }}">{{ icon('arrow-left') }}</a>{% endif %}<span class="on">{{ page }}</span>{% if not doc.page_count or page < doc.page_count %}<a href="/app/documents/{{ doc.id }}/view/{{ page + 1 }}">{{ icon('arrow-right') }}</a>{% endif %}</nav>
+    <a class="btn" href="/app/documents/{{ doc.id }}/download">{{ icon('download') }}Origineel</a>
+  {% endcall %}
+  {% if label %}<div class="alert info">{{ icon('eye') }}<span>Gemarkeerd: {{ label }}</span></div>{% endif %}
+  <figure class="sheet skeleton"><img src="/app/documents/{{ doc.id }}/page/{{ page }}.png{% if hl %}?hl={{ hl }}{% endif %}" alt="Pagina {{ page }} van {{ doc.original_filename }}"></figure>
 </div>
-<img class="page-image" src="/app/documents/{{ doc.id }}/page/{{ page }}.png{% if hl %}?hl={{ hl }}{% endif %}" alt="Pagina {{ page }} van {{ doc.original_filename }}">
 {% endblock %}

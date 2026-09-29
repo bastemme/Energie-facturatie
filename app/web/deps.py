@@ -13,11 +13,12 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
 from app.domain.enums import CaseStatus, Confidence, ReviewStatus
-from app.domain.money import format_decimal_nl, format_eur
+from app.domain.money import format_decimal_nl, format_eur, format_price
 from app.extraction.parsing import parse_date, parse_decimal
 from app.services.cases import STATUS_LABELS_NL
 from app.services.review import REVIEW_LABELS_NL
 from app.web.security import csrf_token
+from app.web.view import LINE_CATEGORY_NL, UNITS_DISPLAY
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -43,7 +44,24 @@ def _pct(v) -> str:
     return "—" if v is None else f"{v * 100:.1f}%".replace(".", ",")
 
 
-templates.env.filters.update(eur=format_eur, nl=_num, d=_date, pct=_pct)
+def _cat(v) -> str:
+    return LINE_CATEGORY_NL.get(getattr(v, "value", v), str(v))
+
+
+def _unit(v) -> str:
+    return UNITS_DISPLAY.get(v, v) if v else ""
+
+
+def _price(v) -> str:
+    return "—" if v is None else "€ " + format_price(Decimal(v))
+
+
+templates.env.filters.update(eur=format_eur, nl=_num, d=_date, pct=_pct, cat=_cat, unit=_unit, price=_price)
+from app.web.icons import LOGO, icon  # noqa: E402
+from app.web.view import finding_view, fmt_value, meter_bar  # noqa: E402
+
+templates.env.globals.update(icon=icon, LOGO=LOGO, finding_view=finding_view, fmt_value=fmt_value,
+                             meter_bar=meter_bar)
 templates.env.globals.update(
     CASE_LABELS=STATUS_LABELS_NL, REVIEW_LABELS=REVIEW_LABELS_NL, ReviewStatus=ReviewStatus, CaseStatus=CaseStatus,
     Confidence=Confidence,
@@ -60,7 +78,24 @@ def render(request: Request, name: str, status_code: int = 200, **context):
     context.update(request=request, csrf=csrf_token(request), messages=messages,
                    operator_name=settings.operator_name, operator_email=settings.operator_email)
     context.setdefault("user", getattr(request.state, "user", None))
+    context.setdefault("path", request.url.path)
+    user = context.get("user")
+    if user is not None and user.is_staff and "queue_count" not in context:
+        context["queue_count"] = _queue_count()
     return templates.TemplateResponse(request, name, context, status_code=status_code)
+
+
+def _queue_count() -> int:
+    from sqlalchemy import func, select
+
+    from app.db import session_factory
+    from app.models import Anomaly
+
+    with session_factory()() as db:
+        return db.scalar(select(func.count()).select_from(Anomaly).where(
+            Anomaly.is_stale.is_(False),
+            Anomaly.review_status.in_([ReviewStatus.OPEN, ReviewStatus.INVESTIGATING, ReviewStatus.INFO_REQUESTED]),
+        )) or 0
 
 
 def redirect(url: str) -> RedirectResponse:

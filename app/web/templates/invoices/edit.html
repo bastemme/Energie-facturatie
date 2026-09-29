@@ -1,0 +1,70 @@
+{% extends "app_base.html" %}
+{% block title %}Gegevens corrigeren · {{ inv.label }}{% endblock %}
+{% macro src(name) %}{% set p = provenance.get(name) %}{% if p %}<span class="prov" data-tip="{{ p.raw_text or 'Handmatig ingevoerd' }}" tabindex="0">{{ {'REGEX':'uit PDF','CSV':'uit CSV','XLSX':'uit Excel','MANUAL':'handmatig','DERIVED':'afgeleid','PDF_TABLE':'uit PDF','LLM_VERIFIED':'AI, gecontroleerd'}[p.method.value] }}{% if p.page %} · p. {{ p.page }}{% endif %}{% if p.row_number %} · rij {{ p.row_number }}{% endif %}</span>{% endif %}{% endmacro %}
+{% block content %}
+<div class="page">
+  {% call ui.page_head('Gegevens corrigeren', 'Factuur ' ~ inv.label ~ '. Elke wijziging wordt vastgelegd in het auditlog en vraagt om nieuwe verificatie.', [('Klanten', '/app/clients'), (client.company_name, '/app/clients/' ~ client.id ~ '?tab=facturen'), ('Factuur ' ~ inv.label, '/app/invoices/' ~ inv.id)]) %}
+    {% if doc %}<a class="btn" href="/app/invoices/{{ inv.id }}">{{ icon('eye') }}Naast document bekijken</a>{% endif %}
+  {% endcall %}
+  <form method="post" action="/app/invoices/{{ inv.id }}" class="panel">
+    {{ ui.csrf_field() }}
+    <div class="form-section">
+      <h3>Kopgegevens</h3>
+      <div class="fields">
+        <div class="field"><label for="f-sup">Leverancier {{ src('supplier') }}</label><input id="f-sup" name="supplier" type="text" value="{{ inv.supplier or '' }}"></div>
+        <div class="field"><label for="f-nr">Factuurnummer {{ src('invoice_number') }}</label><input id="f-nr" name="invoice_number" type="text" value="{{ inv.invoice_number or '' }}"></div>
+        <div class="field"><label for="f-type">Soort</label><select id="f-type" name="invoice_type">{% for t in invoice_types %}<option value="{{ t.value }}" {% if t == inv.invoice_type %}selected{% endif %}>{{ 'Creditnota' if t.value == 'CREDIT_NOTE' else 'Factuur' }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="f-corr">Corrigeert factuur {{ src('corrects_invoice_number') }}</label><input id="f-corr" name="corrects_invoice_number" type="text" value="{{ inv.corrects_invoice_number or '' }}"></div>
+      </div>
+      <div class="fields">
+        <div class="field"><label for="f-date">Factuurdatum {{ src('invoice_date') }}</label><input id="f-date" name="invoice_date" type="text" placeholder="dd-mm-jjjj" value="{{ inv.invoice_date|d if inv.invoice_date else '' }}"></div>
+        <div class="field"><label for="f-ps">Periode van {{ src('billing_period_start') }}</label><input id="f-ps" name="billing_period_start" type="text" placeholder="dd-mm-jjjj" value="{{ inv.billing_period_start|d if inv.billing_period_start else '' }}"></div>
+        <div class="field"><label for="f-pe">Periode t/m</label><input id="f-pe" name="billing_period_end" type="text" placeholder="dd-mm-jjjj" value="{{ inv.billing_period_end|d if inv.billing_period_end else '' }}"></div>
+        <div class="field"><label for="f-com">Product</label><select id="f-com" name="commodity">{% for t in commodities %}<option value="{{ t.value }}" {% if t == inv.commodity %}selected{% endif %}>{{ {'ELECTRICITY':'Elektriciteit','GAS':'Gas','MIXED':'Beide','UNKNOWN':'Onbekend'}[t.value] }}</option>{% endfor %}</select></div>
+      </div>
+      <div class="fields">
+        <div class="field"><label for="f-ean">EAN {{ src('ean') }}</label><input id="f-ean" name="ean" type="text" value="{{ inv.ean or '' }}"></div>
+        <div class="field"><label for="f-meter">Meternummer {{ src('meter_number') }}</label><input id="f-meter" name="meter_number" type="text" value="{{ inv.meter_number or '' }}"></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <h3>Bedragen</h3>
+      <div class="fields">
+        <div class="field"><label for="f-sub">Subtotaal excl. btw {{ src('subtotal_excl_vat') }}</label><input id="f-sub" name="subtotal_excl_vat" type="text" inputmode="decimal" value="{{ inv.subtotal_excl_vat|nl if inv.subtotal_excl_vat is not none else '' }}"></div>
+        <div class="field"><label for="f-vr">Btw % {{ src('vat_rate') }}</label><input id="f-vr" name="vat_rate" type="text" inputmode="decimal" value="{{ inv.vat_rate|nl if inv.vat_rate is not none else '' }}"></div>
+        <div class="field"><label for="f-va">Btw-bedrag {{ src('vat_amount') }}</label><input id="f-va" name="vat_amount" type="text" inputmode="decimal" value="{{ inv.vat_amount|nl if inv.vat_amount is not none else '' }}"></div>
+        <div class="field"><label for="f-tot">Totaal incl. btw {{ src('total_incl_vat') }}</label><input id="f-tot" name="total_incl_vat" type="text" inputmode="decimal" value="{{ inv.total_incl_vat|nl if inv.total_incl_vat is not none else '' }}"></div>
+      </div>
+      <p class="small muted">Getallen in Nederlandse notatie, bijvoorbeeld 1.234,56.</p>
+    </div>
+    <div class="form-section">
+      <h3>Factuurregels</h3>
+      <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="r">Hoeveelheid</th><th>Eenheid</th><th class="r">Tarief</th><th class="r">Bedrag</th><th class="r">Btw %</th><th>Bron</th><th><span class="sr-only">Verwijderen</span></th></tr></thead>
+        <tbody>
+        {% for l in inv.lines %}{% set p = 'line-' ~ l.id ~ '-' %}
+        <tr>
+          <td><input aria-label="Omschrijving" name="{{ p }}description" type="text" value="{{ l.description }}"></td>
+          <td><select aria-label="Categorie" name="{{ p }}category">{% for c in categories %}<option value="{{ c.value }}" {% if c == l.category %}selected{% endif %}>{{ c|cat }}</option>{% endfor %}</select></td>
+          <td><input aria-label="Hoeveelheid" name="{{ p }}quantity" type="text" inputmode="decimal" value="{{ l.quantity|nl if l.quantity is not none else '' }}"></td>
+          <td><input aria-label="Eenheid" name="{{ p }}unit" type="text" value="{{ l.unit or '' }}"></td>
+          <td><input aria-label="Tarief" name="{{ p }}unit_price" type="text" inputmode="decimal" value="{{ l.unit_price|nl if l.unit_price is not none else '' }}"></td>
+          <td><input aria-label="Bedrag" name="{{ p }}amount" type="text" inputmode="decimal" value="{{ l.amount|nl if l.amount is not none else '' }}"></td>
+          <td><input aria-label="Btw-percentage" name="{{ p }}vat_rate" type="text" inputmode="decimal" value="{{ l.vat_rate|nl if l.vat_rate is not none else '' }}"></td>
+          <td class="small muted">{{ {'REGEX':'PDF','CSV':'CSV','XLSX':'Excel','MANUAL':'Handmatig'}.get(l.extraction_method.value, l.extraction_method.value) }}{% if l.source_page %} · p.{{ l.source_page }}{% elif l.source_row %} · rij {{ l.source_row }}{% endif %}</td>
+          <td><label class="check" data-tip="Regel verwijderen"><input type="checkbox" name="{{ p }}delete"><span class="sr-only">Verwijderen</span></label></td>
+        </tr>{% endfor %}
+        <tr>
+          <td><input aria-label="Nieuwe regel" name="new-description" type="text" placeholder="Nieuwe regel toevoegen…"></td>
+          <td><select aria-label="Categorie" name="new-category"><option value="">Automatisch</option>{% for c in categories %}<option value="{{ c.value }}">{{ c|cat }}</option>{% endfor %}</select></td>
+          <td><input aria-label="Hoeveelheid" name="new-quantity" type="text" inputmode="decimal"></td><td><input aria-label="Eenheid" name="new-unit" type="text"></td>
+          <td><input aria-label="Tarief" name="new-unit_price" type="text" inputmode="decimal"></td><td><input aria-label="Bedrag" name="new-amount" type="text" inputmode="decimal"></td>
+          <td><input aria-label="Btw" name="new-vat_rate" type="text" inputmode="decimal"></td><td class="small muted">Handmatig</td><td></td>
+        </tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="form-foot"><a class="btn" href="/app/invoices/{{ inv.id }}">Annuleren</a><button class="btn btn-primary" type="submit">Wijzigingen opslaan</button></div>
+  </form>
+</div>
+{% endblock %}

@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import Response
-from sqlalchemy import select
+from fastapi.responses import JSONResponse, Response
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import get_settings
@@ -27,7 +27,7 @@ from app.extraction.categories import classify_line
 from app.extraction.pdf_text import render_page_png
 from app.ingestion.pipeline import DuplicateDocument, ReprocessBlocked, ingest_upload, process_document
 from app.ingestion.storage import get_store
-from app.ingestion.validation import UploadRejected
+from app.ingestion.validation import UploadRejected, safe_filename
 from app.models import (
     Anomaly,
     Client,
@@ -57,6 +57,15 @@ from app.web.security import (
     require_staff,
     require_user,
     verify_csrf,
+)
+from app.web.view import (
+    bar_chart,
+    box_for,
+    category_distribution,
+    ensure_page_sizes,
+    line_chart,
+    monthly_series,
+    pipeline_stages,
 )
 
 router = APIRouter()
@@ -144,14 +153,26 @@ async def client_create(request: Request, user: User = Depends(require_staff), d
     return redirect(f"/app/clients/{client.id}")
 
 
+CLIENT_TABS = ("overzicht", "documenten", "facturen", "bevindingen", "dossiers", "contracten", "instellingen")
+HUMAN_UPLOAD_ERRORS = {
+    "FAILED": "We konden dit document niet verwerken. Probeer het originele PDF-bestand opnieuw te uploaden.",
+    "NEEDS_OCR": "Dit lijkt een scan zonder tekstlaag. Wij voeren de gegevens handmatig in.",
+}
+
+
 @router.get("/app/clients/{client_id}")
-def client_detail(client_id: str, request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
+def client_detail(client_id: str, request: Request, tab: str = "overzicht", user: User = Depends(require_user),
+                  db: Session = Depends(get_db)):
     client = get_client_for(db, user, client_id)
+    tab = tab if tab in CLIENT_TABS else "overzicht"
+    if not user.is_staff and tab in ("contracten", "instellingen"):
+        tab = "overzicht"
     docs = db.scalars(select(Document).where(Document.client_id == client.id)
                       .order_by(Document.created_at.desc())).all()
     invoices = db.scalars(select(Invoice).where(Invoice.client_id == client.id)
-                          .order_by(Invoice.billing_period_start, Invoice.invoice_number)).all()
+                          .order_by(Invoice.billing_period_start.desc(), Invoice.invoice_number)).all()
     anomalies = db.scalars(select(Anomaly).where(Anomaly.client_id == client.id, Anomaly.is_stale.is_(False))
+                           .options(selectinload(Anomaly.invoice))
                            .order_by(Anomaly.potential_recovery.desc())).all()
     if not user.is_staff:  # clients see reviewed outcomes, not the raw detection queue
         anomalies = [a for a in anomalies if a.review_status == ReviewStatus.CONFIRMED]
@@ -159,9 +180,24 @@ def client_detail(client_id: str, request: Request, user: User = Depends(require
                        .order_by(RecoveryCase.created_at.desc())).all()
     contracts = db.scalars(select(Contract).where(Contract.client_id == client.id)).all()
     users = db.scalars(select(User).where(User.client_id == client.id)).all() if user.is_staff else []
+    s = summary(db, client.id)
+    series = monthly_series(db, client.id)
+    per_invoice: dict[str, list] = {}
+    for a in anomalies:
+        if a.invoice_id and a.review_status not in (ReviewStatus.REJECTED, ReviewStatus.DUPLICATE):
+            per_invoice.setdefault(a.invoice_id, []).append(a)
+    open_findings = [a for a in anomalies if a.review_status in (ReviewStatus.OPEN, ReviewStatus.INVESTIGATING,
+                                                                  ReviewStatus.INFO_REQUESTED)]
     return render(request, "clients/detail.html", user=user, client=client, docs=docs, invoices=invoices,
-                  anomalies=anomalies, cases=cases, contracts=contracts, users=users, s=summary(db, client.id),
+                  anomalies=anomalies, open_findings=open_findings, cases=cases, contracts=contracts, users=users,
+                  s=s, tab=tab, per_invoice=per_invoice, stages=pipeline_stages(s),
+                  bar=bar_chart(series) if series else None,
+                  line=line_chart(series), distribution=category_distribution(anomalies),
                   doc_types=[t for t in DocumentType if t not in (DocumentType.UNKNOWN,)])
+
+
+def _wants_json(request: Request) -> bool:
+    return "application/json" in request.headers.get("accept", "")
 
 
 @router.post("/app/clients/{client_id}/upload", dependencies=[Depends(verify_csrf)])
@@ -172,23 +208,37 @@ async def upload(client_id: str, request: Request, files: list[UploadFile] = Fil
         raise HTTPException(status_code=403, detail="Er is nog geen machtiging vastgelegd voor deze klant.")
     declared = DocumentType(declared_type) if declared_type in DocumentType.__members__ else None
     max_bytes = get_settings().max_upload_bytes
-    ok, failed = 0, []
+    results = []
     for f in files[:200]:
         content = await f.read(max_bytes + 1)
+        name = safe_filename(f.filename)
         try:
             doc = ingest_upload(db, client, f.filename, content, user, declared_type=declared)
             audit(db, "document.uploaded", user=user, client_id=client.id, object_type="document",
                   object_id=doc.id, ip=client_ip(request))
             db.commit()
-            ok += 1
+            inv_ids = db.scalars(select(Invoice.id).where(Invoice.document_id == doc.id)).all()
+            lines = db.scalar(select(func.count()).select_from(InvoiceLine).where(
+                InvoiceLine.invoice_id.in_(inv_ids))) if inv_ids else 0
+            readings = db.scalar(select(func.count()).select_from(MeterReading).where(
+                MeterReading.document_id == doc.id)) or 0
+            ok = doc.status.value not in ("FAILED",)
+            results.append({"name": name, "ok": ok, "status": doc.status.value, "url": f"/app/documents/{doc.id}",
+                            "invoices": len(inv_ids), "lines": lines or 0, "readings": readings,
+                            "message": HUMAN_UPLOAD_ERRORS.get(doc.status.value, "")})
         except (UploadRejected, DuplicateDocument) as exc:
             db.rollback()
-            failed.append(f"{f.filename}: {exc}")
-    if ok:
-        flash(request, f"{ok} document(en) verwerkt.", "success")
-    for msg in failed:
-        flash(request, msg, "error")
-    return redirect(f"/app/clients/{client.id}#documenten")
+            results.append({"name": name, "ok": False, "status": "REJECTED", "message": str(exc), "invoices": 0,
+                            "lines": 0, "readings": 0})
+    if _wants_json(request):
+        return JSONResponse({"files": results, "can_analyse": user.is_staff})
+    done = [r for r in results if r["ok"]]
+    if done:
+        flash(request, f"{len(done)} document(en) verwerkt.", "success")
+    for r in results:
+        if not r["ok"] or r["message"]:
+            flash(request, f"{r['name']}: {r['message']}", "error" if not r["ok"] else "info")
+    return redirect(f"/app/clients/{client.id}?tab=documenten")
 
 
 @router.post("/app/clients/{client_id}/analyse", dependencies=[Depends(verify_csrf)])
@@ -197,11 +247,15 @@ def analyse(client_id: str, request: Request, user: User = Depends(require_staff
     run = run_analysis(db, client, user)
     audit(db, "analysis.run", user=user, client_id=client.id, object_type="analysis_run", object_id=run.id)
     db.commit()
-    msg = f"Analyse uitgevoerd: {run.findings_total} bevindingen, waarvan {run.findings_new} nieuw."
+    if _wants_json(request):
+        return JSONResponse({"findings_total": run.findings_total, "findings_new": run.findings_new,
+                             "rules": len(run.rule_versions), "errors": len(run.errors or [])})
     if run.errors:
-        flash(request, f"{len(run.errors)} controleregel(s) gaven een fout; zie beheer.", "error")
-    flash(request, msg, "success")
-    return redirect(f"/app/clients/{client.id}#bevindingen")
+        flash(request, f"{len(run.errors)} controleregel(s) konden niet worden uitgevoerd; zie het overzicht.",
+              "error")
+    flash(request, f"Analyse afgerond: {run.findings_total} bevindingen, waarvan {run.findings_new} nieuw.",
+          "success")
+    return redirect(f"/app/clients/{client.id}?tab=bevindingen")
 
 
 @router.get("/app/clients/{client_id}/report.pdf")
@@ -228,19 +282,19 @@ def add_client_user(client_id: str, request: Request, email: str = Form(...), fu
     email = email.strip().lower()
     if db.scalar(select(User).where(User.email == email)):
         flash(request, "Dit e-mailadres is al in gebruik.", "error")
-        return redirect(f"/app/clients/{client.id}#gebruikers")
+        return redirect(f"/app/clients/{client.id}?tab=instellingen")
     try:
         pw = hash_password(password)
     except ValueError as exc:
         flash(request, str(exc), "error")
-        return redirect(f"/app/clients/{client.id}#gebruikers")
+        return redirect(f"/app/clients/{client.id}?tab=instellingen")
     new = User(email=email, full_name=full_name or None, password_hash=pw, role=Role.CLIENT, client_id=client.id)
     db.add(new)
     db.flush()
     audit(db, "user.created", user=user, client_id=client.id, object_type="user", object_id=new.id)
     db.commit()
     flash(request, "Klantgebruiker aangemaakt.", "success")
-    return redirect(f"/app/clients/{client.id}#gebruikers")
+    return redirect(f"/app/clients/{client.id}?tab=instellingen")
 
 
 @router.get("/app/clients/{client_id}/export.json")
@@ -271,7 +325,7 @@ def delete_client(client_id: str, request: Request, confirm_name: str = Form(...
     client = get_client_for(db, user, client_id)
     if confirm_name.strip() != client.company_name:
         flash(request, "Bevestiging klopt niet; typ de exacte bedrijfsnaam.", "error")
-        return redirect(f"/app/clients/{client.id}#privacy")
+        return redirect(f"/app/clients/{client.id}?tab=instellingen")
     erase_client(db, client, user, reason or "verzoek")
     db.commit()
     flash(request, "Klant en alle bijbehorende gegevens zijn permanent verwijderd.", "success")
@@ -362,22 +416,53 @@ def invoice_new(request: Request, client_id: str = Form(...), document_id: str =
     db.flush()
     audit(db, "invoice.created_manual", user=user, client_id=client.id, object_type="invoice", object_id=inv.id)
     db.commit()
-    return redirect(f"/app/invoices/{inv.id}")
+    return redirect(f"/app/invoices/{inv.id}/edit")
 
 
 @router.get("/app/invoices/{invoice_id}")
-def invoice_detail(invoice_id: str, request: Request, user: User = Depends(require_user),
+def invoice_detail(invoice_id: str, request: Request, page: int | None = None, user: User = Depends(require_user),
                    db: Session = Depends(get_db)):
     inv = get_owned(db, Invoice, invoice_id, user)
-    provenance = {ev.field_name: ev for ev in db.scalars(select(ExtractedValue)
-                                                         .where(ExtractedValue.invoice_id == inv.id)).all()}
-    anomalies = db.scalars(select(Anomaly).where(Anomaly.invoice_id == inv.id, Anomaly.is_stale.is_(False))).all()
+    anomalies = db.scalars(select(Anomaly).where(Anomaly.invoice_id == inv.id, Anomaly.is_stale.is_(False))
+                           .order_by(Anomaly.potential_recovery.desc())).all()
     if not user.is_staff:
         anomalies = [a for a in anomalies if a.review_status == ReviewStatus.CONFIRMED]
     doc = db.get(Document, inv.document_id) if inv.document_id else None
-    readings = db.scalars(select(MeterReading).where(MeterReading.invoice_id == inv.id)).all()
-    return render(request, "invoices/detail.html", user=user, inv=inv, provenance=provenance, anomalies=anomalies,
-                  doc=doc, readings=readings, categories=list(LineCategory), commodities=list(Commodity),
+    readings = db.scalars(select(MeterReading).where(MeterReading.invoice_id == inv.id)
+                          .order_by(MeterReading.register, MeterReading.reading_date)).all()
+    flagged = {a.invoice_line_id for a in anomalies if a.invoice_line_id and a.review_status not in (
+        ReviewStatus.REJECTED, ReviewStatus.DUPLICATE, ReviewStatus.RESOLVED)}
+    source = None
+    if doc is not None:
+        sizes = ensure_page_sizes(db, doc)
+        pages = [li.source_page for li in inv.lines if li.source_page]
+        pg = page or (min(li.source_page for li in inv.lines if li.id in flagged and li.source_page)
+                      if any(li.id in flagged and li.source_page for li in inv.lines) else (min(pages) if pages else 1))
+        source = {"doc": doc, "page": pg, "size": None, "boxes": [], "rows": []}
+        if sizes and 1 <= pg <= len(sizes):
+            source["size"] = sizes[pg - 1]
+            for li in inv.lines:
+                if li.source_page == pg:
+                    box = box_for(li.source_bbox, f"ln-{li.id}", "hl" if li.id in flagged else "hl ghost",
+                                  li.description)
+                    if box:
+                        source["boxes"].append(box)
+        else:
+            source["rows"] = [{"label": f"Rij {li.source_row}: {li.description}", "source_text": li.source_text}
+                              for li in inv.lines if li.source_text][:30]
+    return render(request, "invoices/detail.html", user=user, inv=inv, anomalies=anomalies, doc=doc,
+                  readings=readings, source=source, flagged=flagged, client=db.get(Client, inv.client_id))
+
+
+@router.get("/app/invoices/{invoice_id}/edit")
+def invoice_edit(invoice_id: str, request: Request, user: User = Depends(require_staff),
+                 db: Session = Depends(get_db)):
+    inv = get_owned(db, Invoice, invoice_id, user)
+    provenance = {ev.field_name: ev for ev in db.scalars(select(ExtractedValue)
+                                                         .where(ExtractedValue.invoice_id == inv.id)).all()}
+    doc = db.get(Document, inv.document_id) if inv.document_id else None
+    return render(request, "invoices/edit.html", user=user, inv=inv, provenance=provenance, doc=doc,
+                  client=db.get(Client, inv.client_id), categories=list(LineCategory), commodities=list(Commodity),
                   invoice_types=list(InvoiceType))
 
 
@@ -427,19 +512,20 @@ async def invoice_update(invoice_id: str, request: Request, user: User = Depends
     except ValueError as exc:
         db.rollback()
         flash(request, str(exc), "error")
-        return redirect(f"/app/invoices/{invoice_id}")
+        return redirect(f"/app/invoices/{invoice_id}/edit")
     if inv.billing_period_start and inv.billing_period_end and inv.billing_period_start > inv.billing_period_end:
         db.rollback()
         flash(request, "Einddatum ligt vóór de begindatum.", "error")
-        return redirect(f"/app/invoices/{invoice_id}")
+        return redirect(f"/app/invoices/{invoice_id}/edit")
     if changed:
         inv.verified_at = None  # any change requires re-verification
         inv.verified_by_id = None
         audit(db, "invoice.corrected", user=user, client_id=inv.client_id, object_type="invoice", object_id=inv.id,
               details={"fields": sorted(set(changed))})
     db.commit()
-    flash(request, "Wijzigingen opgeslagen." if changed else "Geen wijzigingen.", "success")
-    return redirect(f"/app/invoices/{inv.id}")
+    flash(request, "Wijzigingen opgeslagen. Voer de analyse opnieuw uit om ze mee te nemen." if changed
+          else "Geen wijzigingen.", "success")
+    return redirect(f"/app/invoices/{inv.id}/edit" if changed else f"/app/invoices/{inv.id}")
 
 
 def _apply_line(line: InvoiceLine, form, prefix: str) -> bool:
@@ -492,10 +578,10 @@ def contract_create(client_id: str, request: Request, supplier: str = Form(...),
         start, end = form_date(start_date), form_date(end_date)
     except ValueError as exc:
         flash(request, str(exc), "error")
-        return redirect(f"/app/clients/{client.id}#contracten")
+        return redirect(f"/app/clients/{client.id}?tab=contracten")
     if start is None or (end and end < start):
         flash(request, "Ongeldige contractperiode.", "error")
-        return redirect(f"/app/clients/{client.id}#contracten")
+        return redirect(f"/app/clients/{client.id}?tab=contracten")
     doc = get_owned(db, Document, document_id, user) if document_id else None
     c = Contract(client_id=client.id, supplier=supplier.strip()[:200], start_date=start, end_date=end,
                  commodity=Commodity(commodity) if commodity in Commodity.__members__ else Commodity.ELECTRICITY,

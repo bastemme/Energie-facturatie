@@ -142,6 +142,11 @@ def invoice_quality(invoice: Invoice, line: InvoiceLine | None = None) -> Eviden
     return EvidenceQuality.EXTRACTED
 
 
+def upper_first(text: str) -> str:
+    """Capitalize only the first character (str.capitalize would lowercase invoice numbers)."""
+    return text[:1].upper() + text[1:]
+
+
 def invoice_ref(invoice: Invoice) -> str:
     period = f", periode {invoice.period}" if invoice.period else ""
     return f"factuur {invoice.label}{period}"

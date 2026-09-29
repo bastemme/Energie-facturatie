@@ -1,23 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Privacy &amp; beveiliging · {{ operator_name }}{% endblock %}
+{% block title %}Privacy en beveiliging · {{ operator_name }}{% endblock %}
 {% block body %}
-<section class="section"><div class="container narrow">
-  <h1>Privacy en beveiliging</h1>
-  <p class="notice">Deze pagina beschrijft hoe het platform technisch met gegevens omgaat. De formele privacyverklaring en verwerkersovereenkomst worden per opdracht aangeleverd.</p>
-  <h2>Welke gegevens</h2>
-  <p>Bedrijfs- en contactgegevens, energiefacturen, energiecontracten en meterstanden die u aanlevert, en de resultaten van onze controle.</p>
-  <h2>Waarvoor</h2>
-  <p>Uitsluitend voor het controleren van uw energiefacturen, het onderbouwen van correctieverzoeken en het opvolgen daarvan bij uw leverancier(s).</p>
-  <h2>Beveiliging</h2>
-  <ul>
-    <li>Documenten worden versleuteld opgeslagen en alleen via een ingelogde, geautoriseerde sessie getoond.</li>
-    <li>Gegevens van verschillende klanten zijn strikt van elkaar gescheiden.</li>
-    <li>Inloggen, inzage, downloads, exports, verwijderingen en beoordelingen worden gelogd.</li>
-    <li>Er worden geen factuurbedragen of documentinhoud in systeemlogs opgeslagen.</li>
-  </ul>
-  <h2>Externe AI-diensten</h2>
-  <p>Standaard worden uw documenten niet met externe AI-diensten gedeeld. Dit gebeurt alleen na uw uitdrukkelijke toestemming en wanneer dit in de verwerkersovereenkomst is vastgelegd.</p>
-  <h2>Bewaren en verwijderen</h2>
-  <p>Na afloop van de opdracht worden uw gegevens na de afgesproken bewaartermijn verwijderd. U kunt op elk moment om inzage, een export of verwijdering van uw gegevens vragen via <a href="mailto:{{ operator_email }}">{{ operator_email }}</a>.</p>
+<section class="band"><div class="wrap">
+  <article class="prose">
+    <span class="label">Privacy en beveiliging</span>
+    <h1>Hoe wij met uw gegevens omgaan</h1>
+    <div class="alert info">{{ icon('info') }}<span>Deze pagina beschrijft hoe het platform technisch met gegevens omgaat. De formele privacyverklaring en verwerkersovereenkomst ontvangt u per opdracht.</span></div>
+    <h2>Welke gegevens</h2>
+    <p>Bedrijfs- en contactgegevens, energiefacturen, energiecontracten en meterstanden die u aanlevert, en de resultaten van onze controle.</p>
+    <h2>Waarvoor</h2>
+    <p>Uitsluitend voor het controleren van uw energiefacturen, het onderbouwen van correctieverzoeken en het opvolgen daarvan bij uw leverancier(s).</p>
+    <h2>Beveiliging</h2>
+    <ul>
+      <li>Documenten worden versleuteld opgeslagen en alleen via een ingelogde, geautoriseerde sessie getoond.</li>
+      <li>Gegevens van verschillende klanten zijn strikt van elkaar gescheiden.</li>
+      <li>Inloggen, inzage, downloads, exports, verwijderingen en beoordelingen worden gelogd.</li>
+      <li>Er worden geen factuurbedragen of documentinhoud in systeemlogs opgeslagen.</li>
+      <li>Lettertypen en scripts worden vanaf onze eigen server geladen; uw bezoek wordt niet gedeeld met derden.</li>
+    </ul>
+    <h2>Externe AI-diensten</h2>
+    <p>Standaard worden uw documenten niet met externe AI-diensten gedeeld. Dit gebeurt alleen na uw uitdrukkelijke toestemming en wanneer dit in de verwerkersovereenkomst is vastgelegd.</p>
+    <h2>Bewaren en verwijderen</h2>
+    <p>Na afloop van de opdracht worden uw gegevens na de afgesproken bewaartermijn verwijderd. U kunt op elk moment om inzage, een export of verwijdering van uw gegevens vragen via <span class="mono">{{ operator_email }}</span>.</p>
+  </article>
 </div></section>
 {% endblock %}

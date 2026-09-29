@@ -29,6 +29,28 @@ from app.web.security import get_client_for, get_owned, require_staff, require_u
 
 router = APIRouter()
 
+MAIN_PATH = [("REVIEW", "Beoordeling"), ("VERIFIED", "Geverifieerd"), ("CLIENT_APPROVAL", "Akkoord klant"),
+             ("SUBMITTED", "Ingediend"), ("SUPPLIER_REVIEW", "Bij leverancier"), ("APPROVED", "Toegekend"),
+             ("RECOVERED", "Teruggevorderd")]
+_POSITION = {"DETECTED": 0, "REVIEW": 0, "VERIFIED": 1, "CLIENT_APPROVAL": 2, "SUBMITTED": 3, "SUPPLIER_REVIEW": 4,
+             "NEGOTIATION": 4, "DISPUTED": 4, "APPROVED": 5, "RECOVERED": 6, "CLOSED": 7}
+
+
+def case_progress(case: RecoveryCase) -> list[dict]:
+    """Main lifecycle as pipeline steps; side exits are reported separately."""
+    pos = _POSITION.get(case.status.value)
+    if case.status.value == "CLOSED" and not case.recovered_amount:
+        pos = None
+    reached = {e.to_status for e in case.events if e.to_status}
+    steps = []
+    for i, (key, name) in enumerate(MAIN_PATH):
+        if pos is None:
+            state = "done" if key in reached else "todo"
+        else:
+            state = "done" if i < pos or (pos == 7) else ("current" if i == pos else "todo")
+        steps.append({"name": name, "state": state, "good": key == "RECOVERED"})
+    return steps
+
 
 def claim_items_for(db: Session, case: RecoveryCase):
     ids = [a.invoice_id for a in case.anomalies if a.invoice_id]
@@ -80,7 +102,8 @@ def case_detail(case_id: str, request: Request, user: User = Depends(require_use
     items = claim_items_for(db, case)
     letter = generate_letter(case, client, items, get_settings().operator_name) if user.is_staff else None
     return render(request, "cases/detail.html", user=user, case=case, client=client, items=items, letter=letter,
-                  transitions=allowed_transitions(case))
+                  transitions=allowed_transitions(case), progress=case_progress(case),
+                  side_exit=case.status.value in ("REJECTED", "DISPUTED", "INSUFFICIENT_EVIDENCE"))
 
 
 @router.post("/app/cases/{case_id}/transition", dependencies=[Depends(verify_csrf)])

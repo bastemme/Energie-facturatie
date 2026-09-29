@@ -133,3 +133,11 @@ def test_format_price():
     assert format_price(D("0.18450")) == "0,1845"
     assert format_price(D("200")) == "200,00"
     assert format_price(D("0.10154")) == "0,10154"
+
+
+def test_nice_ticks_are_round():
+    from app.web.view import nice_ticks
+
+    assert nice_ticks(420, 4) == [0, 125, 250, 375, 500] or nice_ticks(420, 4) == [0, 200, 400, 600]
+    assert all(t == int(t) for t in nice_ticks(2229.45, 4))
+    assert nice_ticks(98, 5)[-1] >= 98

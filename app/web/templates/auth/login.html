@@ -1,15 +1,27 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import csrf_field with context %}
 {% block title %}Inloggen{% endblock %}
-{% block content %}
-<div class="card narrow">
-  <h1>Inloggen</h1>
-  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
-  <form method="post" action="/login">
-    {{ csrf_field() }}
-    <label for="email">E-mailadres</label><input id="email" name="email" type="email" required autocomplete="username">
-    <label for="password">Wachtwoord</label><input id="password" name="password" type="password" required autocomplete="current-password">
-    <div class="actions mt"><button class="btn" type="submit">Inloggen</button></div>
-  </form>
+{% block bare %}
+<div class="auth">
+  <aside class="auth-side">
+    <a class="logo" href="/">{{ LOGO }}<span>{{ operator_name }}</span></a>
+    <blockquote>Elke bevinding is terug te volgen tot de regel op de factuur waar hij vandaan komt.</blockquote>
+    <small>Versleutelde opslag · volledig auditspoor · no cure, no pay</small>
+  </aside>
+  <div class="auth-main">
+    <form method="post" action="/login" class="auth-card">
+      {{ ui.csrf_field() }}
+      <div class="stack" >
+        <h1>Inloggen</h1>
+        <p class="muted">Welkom terug. Log in op uw {{ operator_name }}-omgeving.</p>
+      </div>
+      {% if error %}<div class="alert critical" role="alert">{{ icon('alert') }}<span>{{ error }}</span></div>{% endif %}
+      <div class="fields">
+        <div class="field"><label for="email">E-mailadres</label><input id="email" name="email" type="email" required autocomplete="username" autofocus></div>
+        <div class="field"><label for="password">Wachtwoord</label><input id="password" name="password" type="password" required autocomplete="current-password"></div>
+      </div>
+      <button class="btn btn-primary btn-lg" type="submit">Inloggen</button>
+      <p class="small muted">Wachtwoord vergeten? Neem contact op met uw contactpersoon bij {{ operator_name }}.</p>
+    </form>
+  </div>
 </div>
 {% endblock %}

@@ -1,14 +1,21 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import csrf_field with context %}
 {% block title %}Leads{% endblock %}
 {% block content %}
-<h1>Leads</h1>
-<div class="table-wrap"><table>
-  <tr><th>Datum</th><th>Bedrijf</th><th>Contact</th><th class="num">Energiekosten/jr</th><th>Bron</th><th>Status</th><th></th></tr>
-  {% for l in leads %}<tr><td>{{ l.created_at|d }}</td><td>{{ l.company_name }}{% if l.kvk_number %}<br><span class="small muted">KvK {{ l.kvk_number }}</span>{% endif %}</td><td>{{ l.contact_name }}<br><span class="small">{{ l.email }} {{ l.phone or '' }}</span></td><td class="num">{{ l.approx_annual_energy_spend|eur }}</td>
-    <td class="small">{{ l.source }}{% if l.referral_partner %} ({{ l.referral_partner }}){% endif %}{% if l.utm_campaign %}<br>{{ l.utm_source }}/{{ l.utm_campaign }}{% endif %}</td>
-    <td><form method="post" action="/app/leads/{{ l.id }}/status" class="inline">{{ csrf_field() }}<select name="status">{% for s in statuses %}<option value="{{ s.value }}" {% if s == l.status %}selected{% endif %}>{{ s.value }}</option>{% endfor %}</select> <button class="btn small secondary" type="submit">Opslaan</button></form></td>
-    <td>{% if not l.converted_client_id %}<a class="btn small" href="/app/clients/new?lead_id={{ l.id }}">Klant maken</a>{% else %}<a href="/app/clients/{{ l.converted_client_id }}">klant</a>{% endif %}</td></tr>
-  {% else %}<tr><td colspan="7" class="muted">Nog geen leads.</td></tr>{% endfor %}
-</table></div>
+<div class="page">
+  {{ ui.page_head('Leads', 'Aanvragen via de website en verwijzingen van partners.') }}
+  <section class="panel">
+    {% if leads %}
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Bedrijf</th><th>Contact</th><th class="r">Energiekosten / jaar</th><th>Bron</th><th>Status</th><th></th></tr></thead>
+      <tbody>{% for l in leads %}<tr>
+        <td><span class="primary">{{ l.company_name }}</span><span class="sub">{{ l.created_at|d }}{% if l.kvk_number %} · KvK {{ l.kvk_number }}{% endif %}{% if l.number_of_locations %} · {{ l.number_of_locations }} locatie(s){% endif %}</span></td>
+        <td data-label="Contact">{{ l.contact_name }}<span class="sub">{{ l.email }}{% if l.phone %} · {{ l.phone }}{% endif %}</span></td>
+        <td class="r num" data-label="Energiekosten">{{ l.approx_annual_energy_spend|eur }}</td>
+        <td class="small" data-label="Bron">{{ {'website':'Website','referral':'Verwijzing'}.get(l.source, l.source) }}{% if l.referral_partner %} · {{ l.referral_partner }}{% endif %}{% if l.utm_campaign %}<span class="sub">{{ l.utm_source }} / {{ l.utm_campaign }}</span>{% endif %}</td>
+        <td data-label="Status"><form method="post" action="/app/leads/{{ l.id }}/status" class="row">{{ ui.csrf_field() }}<select name="status" aria-label="Status">{% for s in statuses %}<option value="{{ s.value }}" {% if s == l.status %}selected{% endif %}>{{ {'NEW':'Nieuw','CONTACTED':'Benaderd','QUALIFIED':'Gekwalificeerd','CONVERTED':'Klant','DISQUALIFIED':'Afgevallen'}[s.value] }}</option>{% endfor %}</select><button class="btn btn-sm" type="submit">Opslaan</button></form></td>
+        <td class="r">{% if not l.converted_client_id %}<a class="btn btn-sm btn-primary" href="/app/clients/new?lead_id={{ l.id }}">Klant maken</a>{% else %}<a class="btn btn-sm" href="/app/clients/{{ l.converted_client_id }}">Naar klant</a>{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{% call ui.empty('leads', 'Nog geen aanvragen', 'Aanvragen via het formulier op de website verschijnen hier. Deel de link met partners met ?ref=partnernaam om verwijzingen te volgen.') %}<a class="btn" href="/" target="_blank" rel="noopener">{{ icon('external') }}Website bekijken</a>{% endcall %}{% endif %}
+  </section>
+</div>
 {% endblock %}

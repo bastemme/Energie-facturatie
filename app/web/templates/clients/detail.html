@@ -1,127 +1,272 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import csrf_field, conf, cls, rstatus, cstatus, verified, kpis with context %}
 {% block title %}{{ client.company_name }}{% endblock %}
 {% block content %}
-<div class="actions"><h1>{{ client.company_name }}</h1></div>
-<p class="muted small">{% if client.kvk_number %}KvK {{ client.kvk_number }} · {% endif %}{{ client.contact_name or '' }} {{ client.contact_email or '' }} · Succesvergoeding {{ client.success_fee_percentage|nl }}%{% if client.engagement_ended_at %} · <strong>Opdracht beëindigd {{ client.engagement_ended_at|d }}</strong>{% endif %}</p>
-{{ kpis(s, client.success_fee_percentage) }}
-<div class="actions mt">
-  {% if user.is_staff %}
-  <form method="post" action="/app/clients/{{ client.id }}/analyse" class="inline">{{ csrf_field() }}<button class="btn" type="submit">Analyse uitvoeren</button></form>
-  <a class="btn secondary" href="/app/clients/{{ client.id }}/cases/new">Dossier aanmaken</a>
-  <a class="btn secondary" href="/app/review?client_id={{ client.id }}">Beoordelingswachtrij</a>
-  {% endif %}
-  <a class="btn secondary" href="/app/clients/{{ client.id }}/report.pdf">Rapportage (PDF)</a>
-</div>
+{% set base = '/app/clients/' ~ client.id %}
+{% set here = base ~ '?tab=' ~ tab %}
+<div class="page">
+  {% call ui.page_head(client.company_name, ((('KvK ' ~ client.kvk_number ~ ' · ') if client.kvk_number else '') ~ (client.contact_name or '') ~ (' · succesvergoeding ' ~ (client.success_fee_percentage|nl) ~ '%' if user.is_staff else '')), [('Klanten', '/app/clients')] if user.is_staff else None) %}
+    <a class="btn" href="{{ base }}/report.pdf">{{ icon('download') }}Rapportage</a>
+    {% if user.is_staff %}
+      <a class="btn" href="{{ base }}/cases/new">{{ icon('cases') }}Dossier maken</a>
+      <form method="post" action="{{ base }}/analyse" class="inline">{{ ui.csrf_field() }}<button class="btn btn-primary" type="submit">{{ icon('bolt') }}Analyse uitvoeren</button></form>
+    {% else %}
+      <a class="btn btn-primary" href="{{ base }}?tab=documenten">{{ icon('upload') }}Facturen uploaden</a>
+    {% endif %}
+  {% endcall %}
 
-<nav class="tabs"><a href="#documenten">Documenten</a><a href="#facturen">Facturen</a><a href="#bevindingen">Bevindingen</a><a href="#dossiers">Dossiers</a>{% if user.is_staff %}<a href="#contracten">Contracten</a><a href="#gebruikers">Gebruikers</a><a href="#privacy">Privacy</a>{% endif %}</nav>
+  {% if client.engagement_ended_at %}<div class="alert review">{{ icon('clock') }}<span>De opdracht is beëindigd op {{ client.engagement_ended_at|d }}. Gegevens worden {{ client.retention_days }} dagen daarna verwijderd.</span></div>{% endif %}
 
-<h2 id="documenten">Documenten</h2>
-<form method="post" action="/app/clients/{{ client.id }}/upload" enctype="multipart/form-data" class="card">
-  {{ csrf_field() }}
-  <div class="form-row">
-    <div><label for="files">Bestanden (PDF, XLSX, CSV, PNG/JPG)</label><input id="files" name="files" type="file" multiple required></div>
-    <div><label for="declared_type">Soort document</label>
-      <select id="declared_type" name="declared_type"><option value="">Automatisch herkennen</option>
-        {% for t in doc_types %}<option value="{{ t.value }}">{{ t.value }}</option>{% endfor %}</select></div>
+  <nav class="tabs" aria-label="Onderdelen">
+    {% set tabs = [('overzicht','Overzicht',None),('documenten','Documenten',docs|length),('facturen','Facturen',invoices|length),('bevindingen','Bevindingen',open_findings|length if user.is_staff else anomalies|length),('dossiers','Dossiers',cases|length)] %}
+    {% if user.is_staff %}{% set tabs = tabs + [('contracten','Contracten',contracts|length),('instellingen','Instellingen',None)] %}{% endif %}
+    {% for key, label, n in tabs %}<a href="{{ base }}?tab={{ key }}"{% if tab == key %} aria-current="page"{% endif %}>{{ label }}{% if n %}<span class="count">{{ n }}</span>{% endif %}</a>{% endfor %}
+  </nav>
+
+{# ================================================================ OVERZICHT #}
+{% if tab == 'overzicht' %}
+  {% if not invoices %}
+  <div class="panel">
+    {% call ui.empty('upload', 'Nog geen facturen', 'Upload de eerste energiefactuur om de analyse te starten. PDF-facturen en exports uit het klantportaal van de leverancier werken allebei.') %}
+      <a class="btn btn-primary" href="{{ base }}?tab=documenten">{{ icon('upload') }}Factuur uploaden</a>
+    {% endcall %}
   </div>
-  <div class="actions mt"><button class="btn" type="submit">Uploaden en verwerken</button></div>
-  <p class="small muted">Bestanden worden versleuteld opgeslagen. Excel/CSV-exports volgen het importformaat in de documentatie.</p>
-</form>
-<div class="table-wrap"><table>
-  <tr><th>Bestand</th><th>Soort</th><th>Status</th><th class="num">Zekerheid</th><th>Geüpload</th></tr>
-  {% for d in docs %}
-  <tr><td><a href="/app/documents/{{ d.id }}">{{ d.original_filename }}</a></td><td>{{ d.doc_type.value }}</td><td>{{ d.status.value }}</td>
-    <td class="num">{{ d.extraction_confidence|pct if d.extraction_confidence is not none else '—' }}</td><td>{{ d.created_at|d }}</td></tr>
-  {% else %}<tr><td colspan="5" class="muted">Nog geen documenten.</td></tr>{% endfor %}
-</table></div>
+  {% else %}
+  {{ ui.figures(s, client.success_fee_percentage) }}
 
-<h2 id="facturen">Facturen</h2>
-<div class="actions mb">{% if user.is_staff %}<form method="post" action="/app/invoices/new" class="inline">{{ csrf_field() }}<input type="hidden" name="client_id" value="{{ client.id }}"><button class="btn small secondary" type="submit">Factuur handmatig invoeren</button></form>{% endif %}</div>
-<div class="table-wrap"><table>
-  <tr><th>Nummer</th><th>Leverancier</th><th>Periode</th><th>EAN</th><th>Type</th><th class="num">Totaal incl. btw</th><th>Gegevens</th></tr>
-  {% for i in invoices %}
-  <tr><td><a href="/app/invoices/{{ i.id }}">{{ i.label }}</a></td><td>{{ i.supplier or '—' }}</td><td class="nowrap">{{ i.period or '—' }}</td>
-    <td class="mono">{{ i.ean or '—' }}</td><td>{{ 'Creditnota' if i.invoice_type.value == 'CREDIT_NOTE' else 'Factuur' }}</td>
-    <td class="num">{{ i.total_incl_vat|eur }}</td><td>{{ verified(i.is_verified) }}</td></tr>
-  {% else %}<tr><td colspan="7" class="muted">Nog geen facturen.</td></tr>{% endfor %}
-</table></div>
-
-<h2 id="bevindingen">Bevindingen</h2>
-{% if not user.is_staff %}<p class="notice info">Hier ziet u de bevindingen die door onze specialisten zijn bevestigd. Mogelijke afwijkingen die nog worden onderzocht, zijn opgenomen in het totaal "Mogelijke discrepanties".</p>{% endif %}
-<div class="table-wrap"><table>
-  <tr><th>Bevinding</th><th>Type</th><th>Zekerheid</th><th>Status</th><th class="num">Mogelijk bedrag</th></tr>
-  {% for a in anomalies %}
-  <tr><td><a href="/app/anomalies/{{ a.id }}">{{ a.title }}</a></td><td>{{ cls(a.classification) }}</td><td>{{ conf(a.confidence) }}</td><td>{{ rstatus(a.review_status) }}</td><td class="num">{{ a.potential_recovery|eur }}</td></tr>
-  {% else %}<tr><td colspan="5" class="muted">Geen bevindingen.</td></tr>{% endfor %}
-</table></div>
-
-<h2 id="dossiers">Terugvorderingsdossiers</h2>
-<div class="table-wrap"><table>
-  <tr><th>Dossier</th><th>Leverancier</th><th>Status</th><th class="num">Geclaimd</th><th class="num">Toegekend</th><th class="num">Teruggevorderd</th><th class="num">Fee</th></tr>
-  {% for c in cases %}
-  <tr><td><a href="/app/cases/{{ c.id }}">{{ c.reference }}</a></td><td>{{ c.supplier }}</td><td>{{ cstatus(c.status) }}</td><td class="num">{{ c.disputed_amount|eur }}</td><td class="num">{{ c.confirmed_amount|eur }}</td><td class="num">{{ c.recovered_amount|eur }}</td><td class="num">{{ c.success_fee|eur }}</td></tr>
-  {% else %}<tr><td colspan="7" class="muted">Nog geen dossiers.</td></tr>{% endfor %}
-</table></div>
-
-{% if user.is_staff %}
-<h2 id="contracten">Contracten</h2>
-<div class="table-wrap"><table>
-  <tr><th>Leverancier</th><th>Referentie</th><th>Product</th><th>Looptijd</th><th class="num">Prijsregels</th><th>Status</th></tr>
-  {% for c in contracts %}
-  <tr><td><a href="/app/contracts/{{ c.id }}">{{ c.supplier }}</a></td><td>{{ c.contract_reference or '—' }}</td><td>{{ c.commodity.value }}</td><td>{{ c.start_date|d }} – {{ c.end_date|d }}</td><td class="num">{{ c.prices|length }}</td><td>{{ verified(c.verified_at) }}</td></tr>
-  {% else %}<tr><td colspan="6" class="muted">Nog geen contracten vastgelegd.</td></tr>{% endfor %}
-</table></div>
-<form method="post" action="/app/clients/{{ client.id }}/contracts" class="card mt">
-  {{ csrf_field() }}
-  <h3>Contract vastleggen</h3>
-  <div class="form-row">
-    <div><label>Leverancier *</label><input name="supplier" type="text" required></div>
-    <div><label>Contractreferentie</label><input name="contract_reference" type="text"></div>
-    <div><label>Product</label><select name="commodity"><option value="ELECTRICITY">Elektriciteit</option><option value="GAS">Gas</option><option value="MIXED">Beide</option></select></div>
-  </div>
-  <div class="form-row">
-    <div><label>Ingangsdatum *</label><input name="start_date" type="date" required></div>
-    <div><label>Einddatum</label><input name="end_date" type="date"></div>
-    <div><label>EAN (leeg = alle aansluitingen)</label><input name="ean" type="text"></div>
-    <div><label>Brondocument</label><select name="document_id"><option value="">—</option>{% for d in docs %}<option value="{{ d.id }}">{{ d.original_filename }}</option>{% endfor %}</select></div>
-  </div>
-  <label>Indexatie (omschrijving)</label><input name="indexation" type="text">
-  <label>Relevante voorwaarden</label><textarea name="relevant_conditions"></textarea>
-  <div class="actions mt"><button class="btn" type="submit">Contract toevoegen</button></div>
-</form>
-
-<h2 id="gebruikers">Klantgebruikers</h2>
-<ul>{% for u in users %}<li>{{ u.email }}{% if not u.is_active %} (gedeactiveerd){% endif %}</li>{% else %}<li class="muted">Geen klantgebruikers.</li>{% endfor %}</ul>
-{% if user.role.value == 'ADMIN' %}
-<form method="post" action="/app/clients/{{ client.id }}/users" class="card">
-  {{ csrf_field() }}
-  <div class="form-row">
-    <div><label>E-mail</label><input name="email" type="email" required></div>
-    <div><label>Naam</label><input name="full_name" type="text"></div>
-    <div><label>Tijdelijk wachtwoord (min. 12 tekens)</label><input name="password" type="password" required minlength="12"></div>
-  </div>
-  <div class="actions mt"><button class="btn secondary" type="submit">Klantgebruiker toevoegen</button></div>
-</form>
-
-<h2 id="privacy">Privacy (AVG)</h2>
-<div class="card">
-  <p>Bewaartermijn: {{ client.retention_days }} dagen na einde opdracht · Machtiging: {{ 'vastgelegd (' ~ client.consent_text_version ~ ', ' ~ (client.consent_given_at|d) ~ ')' if client.consent_given else 'ontbreekt' }} · AI-verwerking: {{ 'toegestaan' if client.ai_processing_allowed else 'niet toegestaan' }}</p>
-  <div class="actions">
-    <a class="btn secondary" href="/app/clients/{{ client.id }}/export.json">Gegevensexport (inzageverzoek)</a>
-    {% if not client.engagement_ended_at %}<form method="post" action="/app/clients/{{ client.id }}/end-engagement" class="inline">{{ csrf_field() }}<button class="btn secondary" type="submit">Opdracht beëindigen (start bewaartermijn)</button></form>{% endif %}
-  </div>
-  <form method="post" action="/app/clients/{{ client.id }}/delete" class="mt">
-    {{ csrf_field() }}
-    <h3>Alle gegevens permanent verwijderen</h3>
-    <p class="small muted">Verwijdert documenten (inclusief versleutelde bestanden), facturen, bevindingen en dossiers. Dit kan niet ongedaan worden gemaakt. Het auditlog bewaart alleen dat en wanneer er is verwijderd.</p>
-    <div class="form-row">
-      <div><label>Typ de exacte bedrijfsnaam ter bevestiging</label><input name="confirm_name" type="text" required></div>
-      <div><label>Reden</label><input name="reason" type="text" required></div>
+  <div class="grid-3-1">
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><div><h2>Factuurwaarde per maand</h2><p>Waar zitten de afwijkingen in de tijd?</p></div>
+          <div class="legend"><span><i class="key"></i>Factuurwaarde incl. btw</span><span><i class="key review"></i>Maand met mogelijke discrepantie</span></div></div>
+        <div class="panel-body">{{ bar }}</div>
+      </section>
+      {% if line %}
+      <section class="panel">
+        <div class="panel-head"><div><h2>Elektriciteitsverbruik</h2><p>Gefactureerde kWh per maand, alle aansluitingen</p></div>
+          <div class="legend"><span><i class="key review"></i>Maand met bevinding</span></div></div>
+        <div class="panel-body">{{ line }}</div>
+      </section>
+      {% endif %}
     </div>
-    <div class="actions mt"><button class="btn danger" type="submit">Permanent verwijderen</button></div>
-  </form>
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><h2>Terugvordering</h2></div>
+        <div class="panel-body bars">
+          {% set top = stages[0].amount if stages[0].amount > 0 else 1 %}
+          {% for st in stages %}<div class="b"><span class="b-name">{{ st.name }}</span>{{ meter_bar(st.amount, top, st.cls) }}<span class="b-val">{{ st.amount|eur }}</span></div>{% endfor %}
+        </div>
+        <div class="panel-foot">Alleen het teruggevorderde bedrag telt voor de succesvergoeding.</div>
+      </section>
+      {% if distribution %}
+      <section class="panel">
+        <div class="panel-head"><h2>Soorten bevindingen</h2></div>
+        <div class="panel-body bars">
+          {% set top = distribution|map(attribute=2)|max %}
+          {% for name, n, amt in distribution %}<div class="b"><span class="b-name">{{ name }} <span class="muted">({{ n }})</span></span>{{ meter_bar(amt, top if top > 0 else 1, 'review') }}<span class="b-val">{{ amt|eur }}</span></div>{% endfor %}
+        </div>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="section-head"><h2>{{ 'Vraagt aandacht' if user.is_staff else 'Bevestigde bevindingen' }}</h2><a href="{{ base }}?tab=bevindingen">Alle bevindingen {{ icon('arrow-right') }}</a></div>
+    {% set shown = (open_findings if user.is_staff else anomalies)[:3] %}
+    {% if shown %}<div class="findings">{% for a in shown %}{{ ui.finding_card(a, here) }}{% endfor %}</div>
+    {% else %}<div class="panel">{{ ui.empty('check-circle', 'Niets dat op u wacht', 'Er staan geen bevindingen open. Nieuwe facturen worden automatisch gecontroleerd zodra ze zijn geüpload.' if user.is_staff else 'Zodra onze specialisten een afwijking hebben bevestigd, ziet u die hier met de volledige onderbouwing.') }}</div>{% endif %}
+  </section>
+  {% endif %}
+
+{# ================================================================ DOCUMENTEN #}
+{% elif tab == 'documenten' %}
+  <div class="grid-3-1">
+    <div class="stack">
+      <form method="post" action="{{ base }}/upload" enctype="multipart/form-data" data-upload="proc" data-analyse="{{ base }}/analyse" data-next="{{ base }}?tab={{ 'bevindingen' if user.is_staff else 'documenten' }}" class="stack">
+        {{ ui.csrf_field() }}
+        <label class="dropzone" for="files">
+          <span class="dz-icon">{{ icon('upload') }}</span>
+          <b>Sleep facturen hierheen of kies bestanden</b>
+          <span class="muted">PDF, Excel (XLSX) of CSV · maximaal 25 MB per bestand · versleuteld opgeslagen</span>
+          <input id="files" name="files" type="file" multiple required accept=".pdf,.xlsx,.csv,.png,.jpg,.jpeg">
+          <span class="dz-files" aria-live="polite"></span>
+        </label>
+        <div class="row">
+          <div class="field grow"><label for="declared_type" class="sr-only">Soort document</label>
+            <select id="declared_type" name="declared_type"><option value="">Soort document: automatisch herkennen</option>{% for t in doc_types %}<option value="{{ t.value }}">{{ ui.doc_type_nl(t) }}</option>{% endfor %}</select></div>
+          <button class="btn btn-primary" type="submit">{{ icon('upload') }}Uploaden en controleren</button>
+        </div>
+      </form>
+      <section class="panel" id="proc" hidden aria-live="polite">
+        <div class="panel-head"><h2>Documenten verwerken</h2></div>
+        <div class="panel-body stack">
+          <div class="progress"><svg aria-hidden="true"><rect x="0" y="0" width="0%" height="4" rx="2"/></svg></div>
+          <ul class="process">
+            <li data-step="upload"><span class="st"></span><span>Uploaden</span><span class="detail"></span></li>
+            <li data-step="read"><span class="st"></span><span>Document lezen</span><span class="detail"></span></li>
+            <li data-step="extract"><span class="st"></span><span>Energiegegevens uitlezen</span><span class="detail"></span></li>
+            <li data-step="tariffs"><span class="st"></span><span>Tarieven en contract controleren</span><span class="detail"></span></li>
+            <li data-step="discrepancies"><span class="st"></span><span>Afwijkingen zoeken</span><span class="detail"></span></li>
+          </ul>
+          <div data-summary hidden></div>
+        </div>
+      </section>
+    </div>
+    <aside class="panel panel-pad stack">
+      <h2 class="label">Wat kunt u aanleveren</h2>
+      <p class="small">Energiefacturen en creditnota's (PDF), exports uit het klantportaal van uw leverancier (Excel of CSV), meterstanden en uw leveringscontract.</p>
+      <p class="small muted">Gescande facturen zonder tekstlaag worden handmatig ingevoerd door onze specialisten.</p>
+    </aside>
+  </div>
+  <section class="panel">
+    {% if docs %}
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Document</th><th>Soort</th><th>Status</th><th class="r">Uitleeszekerheid</th><th class="r">Geüpload</th></tr></thead>
+      <tbody>{% for d in docs %}<tr>
+        <td><a class="primary row" href="/app/documents/{{ d.id }}">{{ ui.doc_icon(d) }}<span>{{ d.original_filename }}</span></a></td>
+        <td data-label="Soort">{{ ui.doc_type_nl(d.doc_type) }}</td>
+        <td data-label="Status">{{ ui.doc_status(d) }}</td>
+        <td class="r num" data-label="Zekerheid">{{ d.extraction_confidence|pct if d.extraction_confidence is not none else '—' }}</td>
+        <td class="r num muted" data-label="Geüpload">{{ d.created_at|d }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{{ ui.empty('doc', 'Nog geen documenten', 'Upload uw eerste energiefactuur hierboven om de analyse te starten.') }}{% endif %}
+  </section>
+
+{# ================================================================ FACTUREN #}
+{% elif tab == 'facturen' %}
+  <section class="panel">
+    <div class="panel-head"><div><h2>Facturen</h2><p>Klik een factuur voor de analyse naast het originele document.</p></div>
+      {% if user.is_staff %}<form method="post" action="/app/invoices/new" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="client_id" value="{{ client.id }}"><button class="btn btn-sm" type="submit">{{ icon('plus') }}Handmatig invoeren</button></form>{% endif %}</div>
+    {% if invoices %}
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Factuur</th><th>Periode</th><th>Aansluiting</th><th>Gegevens</th><th class="r">Bevindingen</th><th class="r">Totaal incl. btw</th></tr></thead>
+      <tbody>{% for i in invoices %}{% set fs = per_invoice.get(i.id, []) %}<tr>
+        <td><a class="primary" href="/app/invoices/{{ i.id }}">{{ i.label }}</a><span class="sub">{{ i.supplier or 'Leverancier onbekend' }}{% if i.invoice_type.value == 'CREDIT_NOTE' %} · creditnota{% endif %}</span></td>
+        <td class="num" data-label="Periode">{{ i.period or '—' }}</td>
+        <td data-label="EAN"><span class="tag">{{ i.ean or '—' }}</span></td>
+        <td data-label="Gegevens">{{ ui.verified(i.is_verified) }}</td>
+        <td class="r" data-label="Bevindingen">{% if fs %}{{ ui.chip(fs|length ~ (' bevinding' if fs|length == 1 else ' bevindingen'), 'review') }}{% else %}<span class="muted small">Geen</span>{% endif %}</td>
+        <td class="r num" data-label="Totaal">{{ i.total_incl_vat|eur }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{% call ui.empty('invoice', 'Nog geen facturen', 'Facturen verschijnen hier zodra documenten zijn uitgelezen.') %}<a class="btn btn-primary" href="{{ base }}?tab=documenten">{{ icon('upload') }}Facturen uploaden</a>{% endcall %}{% endif %}
+  </section>
+
+{# ================================================================ BEVINDINGEN #}
+{% elif tab == 'bevindingen' %}
+  {% if not user.is_staff %}<div class="alert info">{{ icon('info') }}<span>U ziet hier bevindingen die door onze specialisten zijn bevestigd, met de volledige onderbouwing. Mogelijke afwijkingen die nog worden onderzocht, zijn meegeteld in "Mogelijke discrepanties".</span></div>{% endif %}
+  {% set groups = [('Te beoordelen', open_findings), ('Bevestigd', anomalies|selectattr('review_status.value','equalto','CONFIRMED')|list), ('Afgesloten', anomalies|selectattr('review_status.value','in',['REJECTED','DUPLICATE','RESOLVED'])|list)] if user.is_staff else [('Bevestigd', anomalies)] %}
+  {% set any = namespace(v=false) %}
+  {% for title, items in groups if items %}{% set any.v = true %}
+  <section class="section">
+    <div class="section-head"><h2>{{ title }} <span class="muted">{{ items|length }}</span></h2></div>
+    <div class="findings">{% for a in items %}{{ ui.finding_card(a, here) }}{% endfor %}</div>
+  </section>
+  {% endfor %}
+  {% if not any.v %}<div class="panel">{{ ui.empty('search', 'Nog geen bevindingen', 'Upload facturen en voer de analyse uit. Elke afwijking verschijnt hier met berekening en bron.' if user.is_staff else 'Zodra onze specialisten een afwijking hebben bevestigd, ziet u die hier.') }}</div>{% endif %}
+  {{ ui.review_dialog(here) }}
+
+{# ================================================================ DOSSIERS #}
+{% elif tab == 'dossiers' %}
+  <section class="panel">
+    {% if cases %}
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Dossier</th><th>Status</th><th class="r">Geclaimd</th><th class="r">Toegekend</th><th class="r">Teruggevorderd</th><th class="r">Succesvergoeding</th></tr></thead>
+      <tbody>{% for c in cases %}<tr>
+        <td><a class="primary" href="/app/cases/{{ c.id }}">{{ c.reference }}</a><span class="sub">{{ c.supplier }}</span></td>
+        <td data-label="Status">{{ ui.case_chip(c.status) }}</td>
+        <td class="r num" data-label="Geclaimd">{{ c.disputed_amount|eur }}</td><td class="r num" data-label="Toegekend">{{ c.confirmed_amount|eur }}</td>
+        <td class="r num" data-label="Teruggevorderd"><b>{{ c.recovered_amount|eur }}</b></td><td class="r num" data-label="Fee">{{ c.success_fee|eur }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{% call ui.empty('cases', 'Nog geen dossiers', 'Bevestigde bevindingen worden per leverancier gebundeld in een dossier en als correctieverzoek ingediend.') %}{% if user.is_staff %}<a class="btn btn-primary" href="{{ base }}/cases/new">{{ icon('plus') }}Dossier maken</a>{% endif %}{% endcall %}{% endif %}
+  </section>
+
+{# ================================================================ CONTRACTEN #}
+{% elif tab == 'contracten' %}
+  <section class="panel">
+    <div class="panel-head"><div><h2>Contracten</h2><p>Prijzen uit het contract, per periode vastgelegd en geverifieerd. Hiermee worden tarieven gecontroleerd.</p></div>
+      <button class="btn btn-sm btn-primary" type="button" data-dialog-open="contract-dialog">{{ icon('plus') }}Contract vastleggen</button></div>
+    {% if contracts %}
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Leverancier</th><th>Product</th><th>Looptijd</th><th class="r">Prijsregels</th><th>Status</th></tr></thead>
+      <tbody>{% for c in contracts %}<tr><td><a class="primary" href="/app/contracts/{{ c.id }}">{{ c.supplier }}</a><span class="sub">{{ c.contract_reference or 'Zonder referentie' }}</span></td>
+        <td data-label="Product">{{ {'ELECTRICITY':'Elektriciteit','GAS':'Gas','MIXED':'Elektriciteit en gas'}.get(c.commodity.value, c.commodity.value) }}</td>
+        <td class="num" data-label="Looptijd">{{ c.start_date|d }} – {{ c.end_date|d if c.end_date else 'doorlopend' }}</td>
+        <td class="r num" data-label="Prijsregels">{{ c.prices|length }}</td><td data-label="Status">{{ ui.verified(c.verified_at) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{% call ui.empty('contract', 'Nog geen contract vastgelegd', 'Zonder contractprijzen kunnen tarieven niet worden gecontroleerd. Leg de afgesproken prijzen per periode vast vanuit het ondertekende contract.') %}<button class="btn btn-primary" type="button" data-dialog-open="contract-dialog">{{ icon('plus') }}Contract vastleggen</button>{% endcall %}{% endif %}
+  </section>
+  <dialog id="contract-dialog" aria-labelledby="cd-title">
+    <form method="post" action="{{ base }}/contracts">{{ ui.csrf_field() }}
+      <div class="dialog-head"><h2 id="cd-title">Contract vastleggen</h2><p>Daarna voegt u de afgesproken prijzen per periode toe.</p></div>
+      <div class="dialog-body">
+        <div class="fields"><div class="field"><label for="c-sup">Leverancier</label><input id="c-sup" name="supplier" type="text" required></div>
+          <div class="field"><label for="c-ref">Contractreferentie</label><input id="c-ref" name="contract_reference" type="text"></div></div>
+        <div class="fields"><div class="field"><label for="c-com">Product</label><select id="c-com" name="commodity"><option value="ELECTRICITY">Elektriciteit</option><option value="GAS">Gas</option><option value="MIXED">Beide</option></select></div>
+          <div class="field"><label for="c-ean">EAN <span class="muted">(leeg = alle)</span></label><input id="c-ean" name="ean" type="text"></div></div>
+        <div class="fields"><div class="field"><label for="c-start">Ingangsdatum</label><input id="c-start" name="start_date" type="date" required></div>
+          <div class="field"><label for="c-end">Einddatum</label><input id="c-end" name="end_date" type="date"></div></div>
+        <div class="field"><label for="c-doc">Brondocument</label><select id="c-doc" name="document_id"><option value="">Geen</option>{% for d in docs %}<option value="{{ d.id }}">{{ d.original_filename }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="c-idx">Indexatie</label><input id="c-idx" name="indexation" type="text" placeholder="Bijv. jaarlijks per 1 januari volgens ..."></div>
+      </div>
+      <div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Annuleren</button><button class="btn btn-primary" type="submit">Opslaan</button></div>
+    </form>
+  </dialog>
+
+{# ================================================================ INSTELLINGEN #}
+{% elif tab == 'instellingen' %}
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head"><h2>Bedrijf en afspraken</h2></div>
+      <div class="panel-body"><dl class="dl">
+        <dt>Contactpersoon</dt><dd>{{ client.contact_name or '—' }}</dd>
+        <dt>E-mail</dt><dd>{{ client.contact_email or '—' }}</dd>
+        <dt>Telefoon</dt><dd>{{ client.contact_phone or '—' }}</dd>
+        <dt>Locaties</dt><dd>{{ client.number_of_locations or '—' }}</dd>
+        <dt>Leveranciers</dt><dd>{{ client.suppliers or '—' }}</dd>
+        <dt>Succesvergoeding</dt><dd class="num">{{ client.success_fee_percentage|nl }}% van teruggevorderd</dd>
+        <dt>Btw</dt><dd>{{ 'Verrekent btw (btw-verschillen tellen niet als terugvordering)' if client.vat_deductible else 'Verrekent geen btw' }}</dd>
+        <dt>Machtiging</dt><dd>{% if client.consent_given %}{{ ui.chip('Vastgelegd', 'positive') }} <span class="small muted">{{ client.consent_text_version }} · {{ client.consent_given_at|d }}{% if client.consent_given_by %} · {{ client.consent_given_by }}{% endif %}</span>{% else %}{{ ui.chip('Ontbreekt', 'critical') }}{% endif %}</dd>
+        <dt>AI-verwerking</dt><dd>{{ 'Toegestaan' if client.ai_processing_allowed else 'Niet toegestaan' }}</dd>
+      </dl></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Klantgebruikers</h2>{% if user.role.value == 'ADMIN' %}<button class="btn btn-sm" type="button" data-dialog-open="user-dialog">{{ icon('plus') }}Toevoegen</button>{% endif %}</div>
+      {% if users %}<div class="table-wrap"><table class="table"><tbody>{% for u in users %}<tr><td><span class="primary">{{ u.full_name or u.email }}</span><span class="sub">{{ u.email }}</span></td><td class="r">{{ ui.chip('Actief', 'positive') if u.is_active else ui.chip('Gedeactiveerd', 'quiet') }}</td></tr>{% endfor %}</tbody></table></div>
+      {% else %}{{ ui.empty('users', 'Nog geen klantgebruikers', 'Geef de klant toegang tot het portaal om documenten te uploaden en bevestigde bevindingen te volgen.') }}{% endif %}
+    </section>
+  </div>
+  {% if user.role.value == 'ADMIN' %}
+  <section class="panel">
+    <div class="panel-head"><div><h2>Privacy (AVG)</h2><p>Bewaartermijn: {{ client.retention_days }} dagen na einde opdracht</p></div></div>
+    <div class="panel-body row-between">
+      <div class="actions">
+        <a class="btn" href="{{ base }}/export.json">{{ icon('download') }}Gegevensexport (inzageverzoek)</a>
+        {% if not client.engagement_ended_at %}<form method="post" action="{{ base }}/end-engagement" class="inline">{{ ui.csrf_field() }}<button class="btn" type="submit">{{ icon('clock') }}Opdracht beëindigen</button></form>{% endif %}
+      </div>
+      <button class="btn btn-danger" type="button" data-dialog-open="delete-dialog">{{ icon('trash') }}Alle gegevens verwijderen</button>
+    </div>
+  </section>
+  <dialog id="user-dialog" aria-labelledby="ud-title">
+    <form method="post" action="{{ base }}/users">{{ ui.csrf_field() }}
+      <div class="dialog-head"><h2 id="ud-title">Klantgebruiker toevoegen</h2><p>De gebruiker ziet alleen de gegevens van {{ client.company_name }}.</p></div>
+      <div class="dialog-body">
+        <div class="field"><label for="u-email">E-mailadres</label><input id="u-email" name="email" type="email" required></div>
+        <div class="field"><label for="u-name">Naam</label><input id="u-name" name="full_name" type="text"></div>
+        <div class="field"><label for="u-pw">Tijdelijk wachtwoord</label><input id="u-pw" name="password" type="password" required minlength="12"><span class="hint">Minimaal 12 tekens. Deel dit via een apart kanaal.</span></div>
+      </div>
+      <div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Annuleren</button><button class="btn btn-primary" type="submit">Toevoegen</button></div>
+    </form>
+  </dialog>
+  <dialog id="delete-dialog" aria-labelledby="dd-title">
+    <form method="post" action="{{ base }}/delete">{{ ui.csrf_field() }}
+      <div class="dialog-head"><h2 id="dd-title">Alle gegevens permanent verwijderen?</h2><p>Documenten (inclusief versleutelde bestanden), facturen, bevindingen en dossiers worden verwijderd. Dit kan niet ongedaan worden gemaakt. Het auditlog bewaart alleen dát en wanneer er is verwijderd.</p></div>
+      <div class="dialog-body">
+        <div class="field"><label for="d-name">Typ <b>{{ client.company_name }}</b> ter bevestiging</label><input id="d-name" name="confirm_name" type="text" required autocomplete="off"></div>
+        <div class="field"><label for="d-reason">Reden</label><input id="d-reason" name="reason" type="text" required placeholder="Bijv. verwijderverzoek klant d.d. ..."></div>
+      </div>
+      <div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Annuleren</button><button class="btn btn-danger-solid" type="submit">Permanent verwijderen</button></div>
+    </form>
+  </dialog>
+  {% endif %}
+{% endif %}
 </div>
-{% endif %}
-{% endif %}
 {% endblock %}

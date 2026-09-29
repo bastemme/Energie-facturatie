@@ -1,52 +1,67 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import csrf_field, conf, cstatus with context %}
 {% block title %}Dossier {{ case.reference }}{% endblock %}
 {% block content %}
-<p class="small"><a href="/app/clients/{{ client.id }}#dossiers">← {{ client.company_name }}</a></p>
-<div class="actions"><h1>Dossier {{ case.reference }}</h1> {{ cstatus(case.status) }}</div>
-<p class="muted">{{ case.supplier }} · aangemaakt {{ case.created_at|d }}{% if case.submitted_at %} · ingediend {{ case.submitted_at|d }}{% endif %}{% if case.closed_at %} · gesloten {{ case.closed_at|d }}{% endif %}</p>
-<div class="grid grid-4">
-  <div class="kpi potential"><div class="label">Geclaimd (gevraagde correctie)</div><div class="value">{{ case.disputed_amount|eur }}</div></div>
-  <div class="kpi confirmed"><div class="label">Toegekend door leverancier</div><div class="value">{{ case.confirmed_amount|eur }}</div></div>
-  <div class="kpi recovered"><div class="label">Daadwerkelijk ontvangen</div><div class="value">{{ case.recovered_amount|eur }}</div>{% if case.recovered_reference %}<div class="note">Ref. {{ case.recovered_reference }}</div>{% endif %}</div>
-  <div class="kpi fee"><div class="label">Succesvergoeding ({{ case.success_fee_percentage|nl }}%)</div><div class="value">{{ case.success_fee|eur }}</div>{% if case.recovered_amount %}<div class="note">Klant ontvangt {{ (case.recovered_amount - (case.success_fee or 0))|eur }}</div>{% endif %}</div>
+<div class="page">
+  {% call ui.page_head('Dossier ' ~ case.reference, case.supplier ~ ' · ' ~ items|length ~ ' bevinding(en) · aangemaakt ' ~ (case.created_at|d), ([('Dossiers', '/app/cases')] if user.is_staff else []) + [(client.company_name, '/app/clients/' ~ client.id ~ '?tab=dossiers')]) %}
+    {{ ui.case_chip(case.status) }}
+    {% if user.is_staff %}<a class="btn btn-primary" href="/app/cases/{{ case.id }}/package.zip">{{ icon('download') }}Claimpakket</a>{% endif %}
+  {% endcall %}
+
+  <section class="panel panel-pad stack">
+    <ol class="pipeline n7">{% for st in progress %}<li class="{{ st.state }}{{ ' good' if st.good }}"><div class="p-name">{{ st.name }}</div></li>{% endfor %}</ol>
+    {% if side_exit %}<div class="alert {{ 'critical' if case.status.value == 'DISPUTED' else 'review' }}">{{ icon('alert') }}<span><b>{{ CASE_LABELS[case.status] }}.</b> {{ (case.events|selectattr('to_status','equalto',case.status.value)|list|last).note if case.events|selectattr('to_status','equalto',case.status.value)|list else '' }}</span></div>{% endif %}
+  </section>
+
+  <section class="figures" aria-label="Bedragen">
+    <div class="figure"><span class="label"><i class="key review"></i>Geclaimd</span><span class="value">{{ case.disputed_amount|eur }}</span><span class="sub">Gevraagde correctie</span></div>
+    <div class="figure"><span class="label"><i class="key brand"></i>Toegekend</span>{% if case.confirmed_amount is not none %}<span class="value">{{ case.confirmed_amount|eur }}</span>{% else %}<span class="value pending">Nog niet</span>{% endif %}<span class="sub">Door de leverancier</span></div>
+    <div class="figure recovered lead"><span class="label"><i class="key positive"></i>Ontvangen</span>{% if case.recovered_amount is not none %}<span class="value">{{ case.recovered_amount|eur }}</span>{% else %}<span class="value pending">Nog niet</span>{% endif %}<span class="sub">{% if case.recovered_reference %}Referentie {{ case.recovered_reference }}{% else %}Nog niet ontvangen{% endif %}</span></div>
+    <div class="figure"><span class="label"><i class="key"></i>Succesvergoeding {{ case.success_fee_percentage|nl }}%</span>{% if case.success_fee is not none %}<span class="value">{{ case.success_fee|eur }}</span>{% else %}<span class="value pending">Nog niet</span>{% endif %}<span class="sub">{% if case.recovered_amount %}Klant ontvangt {{ (case.recovered_amount - (case.success_fee or 0))|eur }}{% else %}Alleen over ontvangen bedrag{% endif %}</span></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2>Bevindingen in dit dossier</h2></div>
+    <div class="findings">{% for i in items %}{{ ui.finding_card(i.anomaly, '/app/cases/' ~ case.id, actions=False) }}{% endfor %}</div>
+  </section>
+
+  {% if user.is_staff %}
+  <div class="grid-2">
+    <form method="post" action="/app/cases/{{ case.id }}/transition" class="panel">{{ ui.csrf_field() }}
+      <div class="panel-head"><h2>Volgende stap</h2></div>
+      <div class="panel-body stack">
+        {% if transitions %}
+        <div class="field"><label for="to">Nieuwe status</label><select id="to" name="to_status">{% for t in transitions %}<option value="{{ t.value }}">{{ CASE_LABELS[t] }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="tn">Toelichting</label><textarea id="tn" name="note" placeholder="Verplicht bij afwijzen, betwisten of onvoldoende bewijs"></textarea></div>
+        <button class="btn btn-primary" type="submit">Status wijzigen</button>
+        {% else %}<p class="muted">Dit dossier is afgesloten.</p>{% endif %}
+      </div>
+    </form>
+    <form method="post" action="/app/cases/{{ case.id }}/amounts" class="panel">{{ ui.csrf_field() }}
+      <div class="panel-head"><h2>Bedragen vastleggen</h2></div>
+      <div class="panel-body stack">
+        <div class="fields">
+          <div class="field"><label for="ca">Toegekend door leverancier</label><input id="ca" name="confirmed_amount" type="text" inputmode="decimal" placeholder="€ 0,00" value="{{ case.confirmed_amount|nl(2) if case.confirmed_amount is not none else '' }}"></div>
+          <div class="field"><label for="ra">Daadwerkelijk ontvangen</label><input id="ra" name="recovered_amount" type="text" inputmode="decimal" placeholder="€ 0,00" value="{{ case.recovered_amount|nl(2) if case.recovered_amount is not none else '' }}"></div>
+        </div>
+        <div class="field"><label for="rr">Referentie creditnota of betaling</label><input id="rr" name="recovered_reference" type="text" value="{{ case.recovered_reference or '' }}"><span class="hint">Verplicht bij een ontvangen bedrag: dit is het bewijs voor de succesvergoeding.</span></div>
+        <button class="btn" type="submit">Opslaan</button>
+      </div>
+    </form>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><div><h2>Brief aan {{ case.supplier }}</h2><p>{{ letter.subject }}</p></div><a class="btn btn-sm" href="/app/cases/{{ case.id }}/package.zip">{{ icon('download') }}PDF, JSON en bijlagen</a></div>
+    <pre class="letter">{{ letter.body }}</pre>
+    <div class="panel-foot">Opgesteld uit de dossiergegevens met vaste sjablonen{% if letter.used_ai %} en redactioneel verbeterd (getallen gecontroleerd){% endif %}. Lees de brief na voordat u deze verstuurt.</div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Tijdlijn</h2></div>
+    <div class="panel-body stack">
+      <ul class="timeline">{% for e in case.events|reverse %}<li><time>{{ e.created_at|d }}</time><span>{% if e.to_status %}{{ CASE_LABELS[CaseStatus(e.to_status)] }}{% elif e.event_type == 'AMOUNT_UPDATE' %}Bedrag bijgewerkt{% elif e.event_type == 'NOTE' %}Notitie{% else %}{{ e.event_type|lower|capitalize }}{% endif %}{% if e.note %}<span class="note">{{ e.note }}</span>{% endif %}</span></li>{% endfor %}</ul>
+      <form method="post" action="/app/cases/{{ case.id }}/notes" class="row">{{ ui.csrf_field() }}<div class="field grow"><label for="nn" class="sr-only">Notitie</label><input id="nn" name="note" type="text" required placeholder="Notitie toevoegen, bijv. telefonisch contact met leverancier"></div><button class="btn" type="submit">Toevoegen</button></form>
+    </div>
+  </section>
+  {% endif %}
 </div>
-
-<h2>Bevindingen in dit dossier</h2>
-<div class="table-wrap"><table>
-  <tr><th>Factuur</th><th>Periode</th><th>Bevinding</th><th>Zekerheid</th><th class="num">Gevraagd</th>{% if user.is_staff and not case.submitted_at %}<th></th>{% endif %}</tr>
-  {% for i in items %}<tr><td>{{ i.invoice.label if i.invoice else '—' }}</td><td>{{ i.invoice.period if i.invoice and i.invoice.period else '—' }}</td><td><a href="/app/anomalies/{{ i.anomaly.id }}">{{ i.anomaly.title }}</a></td><td>{{ conf(i.anomaly.confidence) }}</td><td class="num">{{ i.anomaly.potential_recovery|eur }}</td>
-  {% if user.is_staff and not case.submitted_at %}<td><form method="post" action="/app/cases/{{ case.id }}/remove/{{ i.anomaly.id }}" class="inline">{{ csrf_field() }}<button class="btn small secondary" type="submit">Uit dossier</button></form></td>{% endif %}</tr>{% endfor %}
-</table></div>
-
-{% if user.is_staff %}
-<div class="grid grid-2 mt">
-  <form method="post" action="/app/cases/{{ case.id }}/transition" class="card">{{ csrf_field() }}
-    <h3>Status wijzigen</h3>
-    {% if transitions %}
-    <select name="to_status">{% for t in transitions %}<option value="{{ t.value }}">{{ CASE_LABELS[t] }}</option>{% endfor %}</select>
-    <label>Toelichting</label><textarea name="note"></textarea>
-    <div class="actions mt"><button class="btn" type="submit">Wijzigen</button></div>
-    {% else %}<p class="muted">Dit dossier is afgesloten.</p>{% endif %}
-  </form>
-  <form method="post" action="/app/cases/{{ case.id }}/amounts" class="card">{{ csrf_field() }}
-    <h3>Bedragen</h3>
-    <label>Toegekend door leverancier (€)</label><input name="confirmed_amount" type="text" value="{{ case.confirmed_amount|nl if case.confirmed_amount is not none else '' }}">
-    <label>Daadwerkelijk ontvangen (€)</label><input name="recovered_amount" type="text" value="{{ case.recovered_amount|nl if case.recovered_amount is not none else '' }}">
-    <label>Referentie ontvangst (creditnota/betaling) *</label><input name="recovered_reference" type="text" value="{{ case.recovered_reference or '' }}">
-    <label>Notitie</label><input name="note" type="text">
-    <p class="small muted">De succesvergoeding wordt uitsluitend berekend over het daadwerkelijk ontvangen bedrag.</p>
-    <div class="actions mt"><button class="btn secondary" type="submit">Opslaan</button></div>
-  </form>
-</div>
-
-<h2>Correspondentie</h2>
-<div class="actions mb"><a class="btn" href="/app/cases/{{ case.id }}/package.zip">Download claimpakket (PDF + JSON + bijlagen)</a></div>
-<div class="card"><p><strong>Onderwerp:</strong> {{ letter.subject }}</p><pre class="letter">{{ letter.body }}</pre>
-<p class="small muted">Gegenereerd uit dossiergegevens met vaste sjablonen{% if letter.used_ai %} en redactioneel verbeterd door AI (getallen gecontroleerd){% endif %}. Controleer de tekst voordat u deze verstuurt.</p></div>
-
-<h2>Tijdlijn</h2>
-<ul class="timeline">{% for e in case.events|reverse %}<li><strong>{{ e.created_at|d }}</strong> — {{ e.event_type }}{% if e.to_status %}: {{ e.from_status or '' }} → {{ e.to_status }}{% endif %}{% if e.note %}<br><span class="muted">{{ e.note }}</span>{% endif %}</li>{% endfor %}</ul>
-<form method="post" action="/app/cases/{{ case.id }}/notes" class="card mt">{{ csrf_field() }}<label>Notitie toevoegen</label><textarea name="note" required></textarea><div class="actions mt"><button class="btn secondary" type="submit">Toevoegen</button></div></form>
-{% endif %}
 {% endblock %}

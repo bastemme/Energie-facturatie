@@ -1,0 +1,33 @@
+{% import "_ui.html" as ui with context %}
+{# Source pane: the original document page with highlighted regions. Expects `source` (see routes_review.source_view). #}
+{% macro source_pane(source, base_url) %}
+<div class="source">
+  {% if source %}{% set doc = source.doc %}
+  <div class="source-bar">
+    <span class="doc-name">{{ ui.doc_icon(doc) }}<span>{{ doc.original_filename }}</span></span>
+    <div class="actions">
+      {% if doc.page_count and doc.page_count > 1 %}<nav class="pager" aria-label="Pagina's">{% for n in range(1, doc.page_count + 1) %}{% if n == source.page %}<span class="on" aria-current="page">{{ n }}</span>{% else %}<a href="{{ base_url }}?doc={{ doc.id }}&page={{ n }}">{{ n }}</a>{% endif %}{% endfor %}</nav>{% endif %}
+      <a class="btn btn-sm btn-ghost" href="/app/documents/{{ doc.id }}/download" data-tip="Origineel downloaden">{{ icon('download') }}<span class="sr-only">Downloaden</span></a>
+    </div>
+  </div>
+  {% if source.size %}
+  <figure class="sheet skeleton" data-page="{{ source.page }}">
+    <img src="/app/documents/{{ doc.id }}/page/{{ source.page }}.png" alt="Pagina {{ source.page }} van {{ doc.original_filename }}" width="{{ source.size[0]|int }}" height="{{ source.size[1]|int }}">
+    <svg class="overlay" viewBox="0 0 {{ source.size[0] }} {{ source.size[1] }}" preserveAspectRatio="none" aria-hidden="true">
+      {% for b in source.boxes %}<rect id="{{ b.id }}" class="{{ b.cls }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}"><title>{{ b.label }}</title></rect>{% endfor %}
+    </svg>
+  </figure>
+  {% if not source.boxes %}<p class="small muted">De bron voor deze bevinding staat niet op deze pagina.</p>{% endif %}
+  {% elif source.rows %}
+  <div class="panel panel-pad stack">
+    <span class="label">Bronregels uit {{ ui.doc_type_nl(doc.doc_type)|lower }}</span>
+    {% for e in source.rows %}<div><span class="small muted">{{ e.label }}</span><div class="row-source">{{ e.source_text }}</div></div>{% endfor %}
+  </div>
+  {% else %}
+  <div class="panel">{{ ui.empty('doc', 'Geen voorbeeld beschikbaar', 'Dit document kan niet als pagina worden getoond. Download het origineel om het te bekijken.') }}</div>
+  {% endif %}
+  {% else %}
+  <div class="panel">{{ ui.empty('layers', 'Afgeleid uit meerdere bronnen', 'Deze bevinding volgt uit de combinatie van facturen of periodes. De afzonderlijke bronnen staan rechts onder "Bron".') }}</div>
+  {% endif %}
+</div>
+{% endmacro %}

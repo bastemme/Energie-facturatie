@@ -1,21 +1,30 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import csrf_field with context %}
 {% block title %}Gebruikers{% endblock %}
 {% block content %}
-<h1>Gebruikers</h1>
-<div class="table-wrap"><table>
-  <tr><th>E-mail</th><th>Naam</th><th>Rol</th><th>Klant</th><th>Laatste login</th><th></th></tr>
-  {% for u in users %}<tr><td>{{ u.email }}</td><td>{{ u.full_name or '' }}</td><td>{{ u.role.value }}</td><td>{{ clients[u.client_id].company_name if u.client_id in clients else '' }}</td><td>{{ u.last_login_at|d }}</td>
-  <td>{% if u.is_active and u.id != user.id %}<form method="post" action="/app/users/{{ u.id }}/deactivate" class="inline">{{ csrf_field() }}<button class="btn small secondary" type="submit">Deactiveren</button></form>{% elif not u.is_active %}gedeactiveerd{% endif %}</td></tr>{% endfor %}
-</table></div>
-<form method="post" action="/app/users" class="card mt">{{ csrf_field() }}
-  <h3>Medewerker toevoegen</h3>
-  <div class="form-row">
-    <div><label>E-mail</label><input name="email" type="email" required></div>
-    <div><label>Naam</label><input name="full_name" type="text"></div>
-    <div><label>Rol</label><select name="role"><option value="REVIEWER">Beoordelaar</option><option value="ADMIN">Beheerder</option></select></div>
-    <div><label>Tijdelijk wachtwoord (min. 12)</label><input name="password" type="password" required minlength="12"></div>
-  </div>
-  <div class="actions mt"><button class="btn" type="submit">Toevoegen</button></div>
-</form>
+<div class="page">
+  {% call ui.page_head('Gebruikers', 'Medewerkers en klantgebruikers. Klantgebruikers maakt u aan vanaf de klantpagina.') %}<button class="btn btn-primary" type="button" data-dialog-open="staff-dialog">{{ icon('plus') }}Medewerker toevoegen</button>{% endcall %}
+  <section class="panel">
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Gebruiker</th><th>Rol</th><th>Klant</th><th>Laatste login</th><th></th></tr></thead>
+      <tbody>{% for u in users %}<tr>
+        <td><span class="primary">{{ u.full_name or u.email }}</span><span class="sub">{{ u.email }}</span></td>
+        <td data-label="Rol">{{ ui.chip({'ADMIN':'Beheerder','REVIEWER':'Beoordelaar','CLIENT':'Klant'}[u.role.value], 'brand' if u.role.value != 'CLIENT' else 'neutral') }}</td>
+        <td data-label="Klant">{{ clients[u.client_id].company_name if u.client_id in clients else '—' }}</td>
+        <td class="num muted" data-label="Laatste login">{{ u.last_login_at|d if u.last_login_at else 'nog niet' }}</td>
+        <td class="r">{% if u.is_active and u.id != user.id %}<form method="post" action="/app/users/{{ u.id }}/deactivate" class="inline">{{ ui.csrf_field() }}<button class="btn btn-sm btn-danger" type="submit">Deactiveren</button></form>{% elif not u.is_active %}{{ ui.chip('Gedeactiveerd', 'quiet') }}{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  <dialog id="staff-dialog" aria-labelledby="sd-title">
+    <form method="post" action="/app/users">{{ ui.csrf_field() }}
+      <div class="dialog-head"><h2 id="sd-title">Medewerker toevoegen</h2><p>Beoordelaars beoordelen bevindingen en beheren dossiers. Beheerders kunnen daarnaast gebruikers, tarieven en privacyacties beheren.</p></div>
+      <div class="dialog-body">
+        <div class="field"><label for="s-email">E-mailadres</label><input id="s-email" name="email" type="email" required></div>
+        <div class="field"><label for="s-name">Naam</label><input id="s-name" name="full_name" type="text"></div>
+        <div class="field"><label for="s-role">Rol</label><select id="s-role" name="role"><option value="REVIEWER">Beoordelaar</option><option value="ADMIN">Beheerder</option></select></div>
+        <div class="field"><label for="s-pw">Tijdelijk wachtwoord</label><input id="s-pw" name="password" type="password" required minlength="12"><span class="hint">Minimaal 12 tekens</span></div>
+      </div>
+      <div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Annuleren</button><button class="btn btn-primary" type="submit">Toevoegen</button></div>
+    </form>
+  </dialog>
+</div>
 {% endblock %}

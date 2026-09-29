@@ -1,0 +1,118 @@
+{# Factuurspoor UI components. Import with: {% import "_ui.html" as ui with context %} #}
+
+{% macro csrf_field() %}<input type="hidden" name="csrf_token" value="{{ csrf }}">{% endmacro %}
+
+{% macro chip(text, cls="neutral", tip=None) %}<span class="chip {{ cls }}"{% if tip %} data-tip="{{ tip }}" tabindex="0"{% endif %}>{{ text }}</span>{% endmacro %}
+
+{% macro conf(c) %}{% set t = {'HIGH': ('Hoog', 'Gebaseerd op expliciete, geverifieerde bronwaarden'), 'MEDIUM': ('Middel', 'Afgeleid, of gebaseerd op nog niet geverifieerde uitlezing'), 'LOW': ('Laag', 'Statistisch of op geschatte meterstanden gebaseerd')}[c.value] %}<span class="conf c-{{ c.value }}" data-tip="Zekerheid: {{ t[1] }}" tabindex="0"><i aria-hidden="true"><b></b><b></b><b></b></i>{{ t[0] }}</span>{% endmacro %}
+
+{% macro review_chip(s) %}{% set cls = {'CONFIRMED':'positive','REJECTED':'quiet','DUPLICATE':'quiet','RESOLVED':'quiet','INVESTIGATING':'brand','INFO_REQUESTED':'brand'}.get(s.value, 'review') %}{{ chip(REVIEW_LABELS[s], cls) }}{% endmacro %}
+
+{% macro case_chip(s) %}{% set cls = {'RECOVERED':'positive','CLOSED':'quiet','APPROVED':'positive','REJECTED':'quiet','INSUFFICIENT_EVIDENCE':'quiet','DISPUTED':'critical','DETECTED':'review','REVIEW':'review'}.get(s.value, 'brand') %}{{ chip(CASE_LABELS[s], cls) }}{% endmacro %}
+
+{% macro verified(v) %}{% if v %}{{ chip('Geverifieerd', 'positive') }}{% else %}{{ chip('Niet geverifieerd', 'review', 'Automatisch uitgelezen; nog niet gecontroleerd tegen het brondocument') }}{% endif %}{% endmacro %}
+
+{% macro value(v, unit) %}{{ fmt_value(v, unit) }}{% endmacro %}
+
+{% macro page_head(title, sub=None, crumbs=None) %}
+<header class="page-head">
+  <div class="grow">
+    {% if crumbs %}<nav class="crumbs" aria-label="Kruimelpad">{% for label, href in crumbs %}{% if href %}<a href="{{ href }}">{{ label }}</a>{% else %}<span>{{ label }}</span>{% endif %}<span aria-hidden="true">/</span>{% endfor %}</nav>{% endif %}
+    <h1>{{ title }}</h1>
+    {% if sub %}<p>{{ sub }}</p>{% endif %}
+  </div>
+  {% if caller %}<div class="actions">{{ caller() }}</div>{% endif %}
+</header>
+{% endmacro %}
+
+{% macro empty(ico, title, text, href=None, label=None) %}
+<div class="empty">
+  <div class="empty-icon">{{ icon(ico) }}</div>
+  <h3>{{ title }}</h3>
+  <p>{{ text }}</p>
+  {% if caller %}<div class="actions">{{ caller() }}</div>{% elif href %}<div class="actions"><a class="btn btn-primary" href="{{ href }}">{{ label }}</a></div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro figures(s, fee_pct=None) %}
+<section class="figures" aria-label="Kerncijfers">
+  <div class="figure lead">
+    <span class="label">Geanalyseerde factuurwaarde</span>
+    <span class="value" data-countup="{{ s.total_invoice_value }}" data-prefix="€ ">{{ s.total_invoice_value|eur }}</span>
+    <span class="sub">{{ s.invoices_analyzed }} facturen, incl. btw</span>
+  </div>
+  <div class="figure">
+    <span class="label"><i class="key review"></i>Mogelijke discrepanties</span>
+    <span class="value">{{ s.potential_discrepancies|eur }}</span>
+    <span class="sub">Nog te verifiëren, geen vaststaande vordering</span>
+  </div>
+  <div class="figure">
+    <span class="label"><i class="key brand"></i>Bevestigd</span>
+    <span class="value">{{ s.confirmed_discrepancies|eur }}</span>
+    <span class="sub">Na beoordeling door een specialist</span>
+  </div>
+  <div class="figure recovered">
+    <span class="label"><i class="key positive"></i>Teruggevorderd</span>
+    <span class="value">{{ s.recovered|eur }}</span>
+    <span class="sub">Daadwerkelijk gecrediteerd of betaald</span>
+  </div>
+  <div class="minis">
+    <span>Ingediend<b>{{ s.claimed_amount|eur }}</b></span>
+    <span>Toegekend door leverancier<b>{{ s.supplier_approved|eur }}</b></span>
+    <span>Succesvergoeding{% if fee_pct is not none %} ({{ fee_pct|nl }}%){% endif %}<b>{{ s.success_fee|eur }}</b></span>
+    <span class="muted">Bedragen excl. btw · overlappende bevindingen niet dubbel geteld</span>
+  </div>
+</section>
+{% endmacro %}
+
+{% macro finding_card(a, next_url='', client=None, actions=True) %}{% set v = finding_view(a) %}
+<article class="finding {{ v.state_class }}" id="f-{{ a.id }}">
+  <div class="stack">
+    <div class="finding-top">
+      {{ chip(v.kind, v.kind_class) }}
+      {% if a.review_status.value != 'OPEN' %}{{ chip(v.status_label, v.status_class) }}{% endif %}
+      {{ conf(a.confidence) }}
+      {% if client %}<span class="small muted">{{ client.company_name }}</span>{% endif %}
+    </div>
+    <h3><a href="/app/anomalies/{{ a.id }}">{{ a.title }}</a></h3>
+    <p class="summary">{{ v.sentence }}</p>
+    <div class="meta">
+      <span>{{ icon('layers') }}{{ v.category }}</span>
+      {% if v.location %}<span>{{ icon('doc') }}{{ v.location }}</span>{% endif %}
+      {% if a.requires_verification and a.review_status.value in ('OPEN','INVESTIGATING','INFO_REQUESTED') %}<span>{{ icon('shield') }}Verificatie vereist</span>{% endif %}
+    </div>
+  </div>
+  <div class="finding-side">
+    <div>
+      {% if a.potential_recovery > 0 %}<div class="amount">{{ a.potential_recovery|eur }}</div><div class="amount-label">mogelijke terugvordering</div>
+      {% else %}<div class="amount">Geen bedrag</div><div class="amount-label">{{ 'signaal, geen bewijs' if a.classification.value == 'ANOMALY' else 'geen terugvordering' }}</div>{% endif %}
+    </div>
+    {% if actions and user and user.is_staff %}
+    <div class="actions">
+      <a class="btn btn-sm" href="/app/anomalies/{{ a.id }}">{{ icon('eye') }}Bewijs</a>
+      {% if a.review_status.value in ('OPEN','INVESTIGATING','INFO_REQUESTED') %}
+      <form method="post" action="/app/anomalies/{{ a.id }}/review" class="inline">{{ csrf_field() }}<input type="hidden" name="action" value="confirm"><input type="hidden" name="next_url" value="{{ next_url }}#f-{{ a.id }}"><button class="btn btn-sm btn-positive" type="submit">{{ icon('check') }}Bevestigen</button></form>
+      <a class="btn btn-sm btn-danger" href="/app/anomalies/{{ a.id }}#beoordeling" data-dialog-open="review-dialog" data-action="reject" data-url="/app/anomalies/{{ a.id }}/review" data-title="Bevinding afwijzen">Afwijzen</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</article>
+{% endmacro %}
+
+{% macro review_dialog(next_url='') %}
+<dialog id="review-dialog" aria-labelledby="review-dialog-title">
+  <form method="post" action="" data-no-loading>
+    {{ csrf_field() }}<input type="hidden" name="action" value="reject"><input type="hidden" name="next_url" value="{{ next_url }}">
+    <div class="dialog-head"><h2 id="review-dialog-title" data-dialog-title>Bevinding afwijzen</h2><p>Leg kort vast waarom. Dit wordt bewaard in het auditspoor van de bevinding.</p></div>
+    <div class="dialog-body"><div class="field"><label for="rd-note">Toelichting</label><textarea id="rd-note" name="note" required placeholder="Bijv. tarief komt overeen met prijswijziging per 1 januari (contract p. 4)."></textarea></div></div>
+    <div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Annuleren</button><button class="btn btn-danger-solid" type="submit">Afwijzen</button></div>
+  </form>
+</dialog>
+{% endmacro %}
+
+{% macro doc_icon(doc) %}{{ icon({'INVOICE':'invoice','CREDIT_NOTE':'invoice','INVOICE_TABLE':'table','METER_DATA':'meter','CONTRACT':'contract'}.get(doc.doc_type.value, 'doc')) }}{% endmacro %}
+
+{% macro doc_status(doc) %}{% set m = {'PROCESSED':('Verwerkt','positive'),'NEEDS_REVIEW':('Controle nodig','review'),'NEEDS_OCR':('Handmatige invoer nodig','review'),'FAILED':('Niet verwerkt','critical'),'STORED':('Opgeslagen','quiet'),'UPLOADED':('Geüpload','quiet')}[doc.status.value] %}{{ chip(m[0], m[1]) }}{% endmacro %}
+
+{% macro doc_type_nl(t) %}{{ {'INVOICE':'Factuur','CREDIT_NOTE':'Creditnota','INVOICE_TABLE':'Factuurexport','METER_DATA':'Meterstanden','CONTRACT':'Contract','OTHER':'Overig','UNKNOWN':'Onbekend'}[t.value] }}{% endmacro %}

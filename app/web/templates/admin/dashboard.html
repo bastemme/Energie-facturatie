@@ -1,44 +1,80 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import kpis with context %}
 {% block title %}Overzicht{% endblock %}
 {% block content %}
-<h1>Overzicht</h1>
-{{ kpis(s) }}
-<h2>Operationeel</h2>
-<div class="grid grid-4">
-  <div class="kpi"><div class="label">Beoordelingswachtrij</div><div class="value"><a href="/app/review">{{ m.review_queue }}</a></div></div>
-  <div class="kpi"><div class="label">Extractie geslaagd</div><div class="value">{{ m.extraction_success_rate|pct if m.extraction_success_rate is not none else '—' }}</div><div class="note">{{ m.invoice_documents }} factuurdocumenten</div></div>
-  <div class="kpi"><div class="label">Fout-positief ratio</div><div class="value">{{ m.false_positive_rate|pct if m.false_positive_rate is not none else '—' }}</div><div class="note">afgewezen / (bevestigd + afgewezen)</div></div>
-  <div class="kpi"><div class="label">Bevindingen: gedetecteerd / bevestigd / afgewezen</div><div class="value">{{ m.anomalies_detected }} / {{ m.anomalies_confirmed }} / {{ m.anomalies_rejected }}</div></div>
-  <div class="kpi recovered"><div class="label">Teruggevorderd per 1.000 facturen</div><div class="value">{{ m.recovered_per_1000_invoices|eur }}</div><div class="note">Kern-KPI</div></div>
-  <div class="kpi"><div class="label">Gem. mogelijk bedrag per factuur</div><div class="value">{{ m.avg_potential_per_invoice|eur }}</div></div>
-  <div class="kpi fee"><div class="label">Omzet (succesvergoedingen)</div><div class="value">{{ m.revenue|eur }}</div></div>
-  <div class="kpi"><div class="label">Verwerkingskosten (geregistreerd)</div><div class="value">€ {{ '%.2f'|format(m.processing_cost_eur)|replace('.', ',') }}</div></div>
-</div>
+<div class="page">
+  {% call ui.page_head('Overzicht', 'Alle klanten samen. Bedragen excl. btw, overlappende bevindingen niet dubbel geteld.') %}
+    <a class="btn" href="/app/clients/new">{{ icon('plus') }}Nieuwe klant</a>
+    <a class="btn btn-primary" href="/app/review">{{ icon('review') }}Beoordelen{% if queue_total %} ({{ queue_total }}){% endif %}</a>
+  {% endcall %}
 
-<h2>Klanten</h2>
-<div class="table-wrap"><table>
-  <tr><th>Klant</th><th class="num">Facturen</th><th class="num">Mogelijk</th><th class="num">Bevestigd</th><th class="num">Ingediend</th><th class="num">Teruggevorderd</th><th class="num">Fee</th></tr>
-  {% for c, cs in client_rows %}<tr><td><a href="/app/clients/{{ c.id }}">{{ c.company_name }}</a></td><td class="num">{{ cs.invoices_analyzed }}</td><td class="num">{{ cs.potential_discrepancies|eur }}</td><td class="num">{{ cs.confirmed_discrepancies|eur }}</td><td class="num">{{ cs.claimed_amount|eur }}</td><td class="num">{{ cs.recovered|eur }}</td><td class="num">{{ cs.success_fee|eur }}</td></tr>
-  {% else %}<tr><td colspan="7" class="muted">Nog geen klanten.</td></tr>{% endfor %}
-</table></div>
+  {% if not client_rows %}
+  <div class="panel">{% call ui.empty('clients', 'Nog geen klanten', 'Maak de eerste klant aan, leg de machtiging en het afgesproken percentage vast en upload de facturen.') %}<a class="btn btn-primary" href="/app/clients/new">{{ icon('plus') }}Eerste klant aanmaken</a>{% endcall %}</div>
+  {% else %}
+  {{ ui.figures(s) }}
 
-<div class="grid grid-2 mt">
-  <div>
-    <h2>Documenten die aandacht vragen</h2>
-    <p class="muted small">{{ m.low_confidence_documents }} totaal (lage zekerheid, OCR nodig of mislukt)</p>
-    <ul>{% for d in problem_docs %}<li><a href="/app/documents/{{ d.id }}">{{ d.original_filename }}</a> — {{ d.status.value }} ({{ clients[d.client_id].company_name if d.client_id in clients else '' }})</li>{% else %}<li class="muted">Geen.</li>{% endfor %}</ul>
-    <h2>Systeemfouten in analyses</h2>
-    <ul>{% for r in failed_runs %}<li>{{ r.created_at|d }} — {{ clients[r.client_id].company_name if r.client_id in clients else r.client_id }}: {% for e in r.errors %}{{ e.rule_id }} ({{ e.error }}) {% endfor %}</li>{% else %}<li class="muted">Geen.</li>{% endfor %}</ul>
-    <h2>Nieuwe leads</h2>
-    <ul>{% for l in new_leads %}<li>{{ l.company_name }} — {{ l.contact_name }} ({{ l.created_at|d }})</li>{% else %}<li class="muted">Geen.</li>{% endfor %}</ul>
+  <div class="grid-3-1">
+    <section class="section">
+      <div class="section-head"><h2>Wacht op beoordeling <span class="muted">{{ queue_total }}</span></h2>{% if queue_total > queue|length %}<a href="/app/review">Alle {{ queue_total }} bekijken {{ icon('arrow-right') }}</a>{% endif %}</div>
+      {% if queue %}<div class="findings">{% for a in queue %}{{ ui.finding_card(a, '/app/admin', clients.get(a.client_id)) }}{% endfor %}</div>
+      {% else %}<div class="panel">{{ ui.empty('check-circle', 'De wachtrij is leeg', 'Alle bevindingen zijn beoordeeld. Nieuwe analyses verschijnen hier automatisch.') }}</div>{% endif %}
+    </section>
+    <div class="stack-lg">
+      <section class="panel">
+        <div class="panel-head"><h2>Terugvordering</h2></div>
+        <div class="panel-body bars">{% set top = stages[0].amount if stages[0].amount > 0 else 1 %}
+          {% for st in stages %}<div class="b"><span class="b-name">{{ st.name }}</span>{{ meter_bar(st.amount, top, st.cls) }}<span class="b-val">{{ st.amount|eur }}</span></div>{% endfor %}</div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Kern-KPI</h2></div>
+        <div class="panel-body stack">
+          <div><div class="label">Teruggevorderd per 1.000 facturen</div><div class="figure-inline">{{ m.recovered_per_1000_invoices|eur }}</div></div>
+          <dl class="dl small">
+            <dt>Fout-positief</dt><dd class="num">{{ m.false_positive_rate|pct if m.false_positive_rate is not none else 'nog geen data' }}</dd>
+            <dt>Extractie geslaagd</dt><dd class="num">{{ m.extraction_success_rate|pct if m.extraction_success_rate is not none else '—' }}</dd>
+            <dt>Omzet (fees)</dt><dd class="num">{{ m.revenue|eur }}</dd>
+            <dt>Verwerkingskosten</dt><dd class="num">€ {{ '%.2f'|format(m.processing_cost_eur)|replace('.', ',') }}</dd>
+          </dl>
+        </div>
+      </section>
+    </div>
   </div>
-  <div>
-    <h2>Precisie per controleregel</h2>
-    <div class="table-wrap"><table><tr><th>Regel</th><th class="num">Totaal</th><th class="num">Bevestigd</th><th class="num">Afgewezen</th><th class="num">Precisie</th></tr>
-    {% for r in m.rule_stats %}<tr><td class="mono">{{ r.rule_id }}</td><td class="num">{{ r.total }}</td><td class="num">{{ r.confirmed }}</td><td class="num">{{ r.rejected }}</td><td class="num">{{ r.precision|pct if r.precision is not none else '—' }}</td></tr>{% else %}<tr><td colspan="5" class="muted">Nog geen data.</td></tr>{% endfor %}</table></div>
-    <h2>Documenten per status</h2>
-    <ul>{% for k, v in m.documents_by_status.items() %}<li>{{ k }}: {{ v }}</li>{% else %}<li class="muted">Geen.</li>{% endfor %}</ul>
-  </div>
+
+  {% if bar %}
+  <section class="panel">
+    <div class="panel-head"><div><h2>Factuurwaarde per maand</h2><p>Alle klanten. Maanden met mogelijke discrepanties zijn gemarkeerd.</p></div>
+      <div class="legend"><span><i class="key"></i>Factuurwaarde incl. btw</span><span><i class="key review"></i>Met mogelijke discrepantie</span></div></div>
+    <div class="panel-body">{{ bar }}</div>
+  </section>
+  {% endif %}
+
+  <section class="panel">
+    <div class="panel-head"><h2>Klanten</h2><a class="small" href="/app/clients">Alle klanten</a></div>
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Klant</th><th class="r">Facturen</th><th class="r">Mogelijk</th><th class="r">Bevestigd</th><th class="r">Teruggevorderd</th><th class="r">Fee</th></tr></thead>
+      <tbody>{% for c, cs in client_rows %}<tr><td><a class="primary" href="/app/clients/{{ c.id }}">{{ c.company_name }}</a></td><td class="r num" data-label="Facturen">{{ cs.invoices_analyzed }}</td><td class="r num" data-label="Mogelijk">{{ cs.potential_discrepancies|eur }}</td><td class="r num" data-label="Bevestigd">{{ cs.confirmed_discrepancies|eur }}</td><td class="r num" data-label="Teruggevorderd"><b>{{ cs.recovered|eur }}</b></td><td class="r num" data-label="Fee">{{ cs.success_fee|eur }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+
+  <details class="panel disclose">
+    <summary class="panel-head"><div><h2>Kwaliteit en systeem</h2><p>Precisie per controleregel, documenten die aandacht vragen en fouten in analyses</p></div><span class="row small muted">{% if problem_docs or failed_runs %}{{ ui.chip((problem_docs|length + failed_runs|length) ~ ' aandachtspunten', 'review') }}{% else %}{{ ui.chip('Alles in orde', 'positive') }}{% endif %}</span></summary>
+    <div class="grid-2 panel-body">
+      <div class="stack">
+        <h3 class="label">Precisie per controleregel</h3>
+        {% if m.rule_stats %}<div class="table-wrap"><table class="table table-compact"><thead><tr><th>Regel</th><th class="r">Totaal</th><th class="r">Bevestigd</th><th class="r">Afgewezen</th><th class="r">Precisie</th></tr></thead>
+        <tbody>{% for r in m.rule_stats %}<tr><td><span class="tag">{{ r.rule_id }}</span></td><td class="r num">{{ r.total }}</td><td class="r num">{{ r.confirmed }}</td><td class="r num">{{ r.rejected }}</td><td class="r num">{{ r.precision|pct if r.precision is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div>
+        {% else %}<p class="small muted">Nog geen beoordeelde bevindingen.</p>{% endif %}
+      </div>
+      <div class="stack">
+        <h3 class="label">Documenten die aandacht vragen</h3>
+        {% if problem_docs %}<div class="table-wrap"><table class="table table-compact"><tbody>{% for d in problem_docs %}<tr><td><a class="primary" href="/app/documents/{{ d.id }}">{{ d.original_filename }}</a><span class="sub">{{ clients[d.client_id].company_name if d.client_id in clients else '' }}</span></td><td class="r">{{ ui.doc_status(d) }}</td></tr>{% endfor %}</tbody></table></div>
+        {% else %}<p class="small muted">Geen documenten met problemen.</p>{% endif %}
+        <h3 class="label">Fouten in analyses</h3>
+        {% if failed_runs %}<ul class="small">{% for r in failed_runs %}<li>{{ r.created_at|d }} · {{ clients[r.client_id].company_name if r.client_id in clients else '' }}: {% for e in r.errors %}<span class="tag">{{ e.rule_id }}</span> {% endfor %}</li>{% endfor %}</ul>
+        {% else %}<p class="small muted">Alle controleregels draaiden foutloos.</p>{% endif %}
+      </div>
+    </div>
+  </details>
+  {% endif %}
+  {{ ui.review_dialog('/app/admin') }}
 </div>
 {% endblock %}

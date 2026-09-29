@@ -1,9 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Bedankt · {{ operator_name }}{% endblock %}
+{% block title %}Aanvraag ontvangen · {{ operator_name }}{% endblock %}
 {% block body %}
-<section class="section"><div class="container narrow">
-  <h1>Bedankt voor uw aanvraag</h1>
-  <p>Wij nemen binnen twee werkdagen contact met u op om de aanlevering van uw facturen te bespreken. U hoeft nu nog niets te sturen.</p>
-  <p><a href="/">Terug naar de homepage</a></p>
+<section class="band"><div class="wrap">
+  <div class="panel" >
+    {% call ui.empty('check-circle', 'Bedankt, uw aanvraag is binnen', 'Wij nemen binnen twee werkdagen contact met u op om de aanlevering van uw facturen te bespreken. U hoeft nu nog niets te sturen.') %}
+      <a class="btn" href="/">Terug naar de homepage</a>
+    {% endcall %}
+  </div>
 </div></section>
 {% endblock %}

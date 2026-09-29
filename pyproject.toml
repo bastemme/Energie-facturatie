@@ -42,6 +42,9 @@ ignore = ["S101", "B008", "S311"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "E501"]
+# SVG path data; Markup is built only from constants and escape()d values
+"app/web/icons.py" = ["E501", "S704"]
+"app/web/view.py" = ["S704"]
 
 [build-system]
 requires = ["hatchling"]

@@ -1,55 +1,81 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import csrf_field, conf, cls, rstatus, value with context %}
-{% block title %}Bevinding{% endblock %}
+{% import "_source.html" as src with context %}
+{% block title %}{{ a.title }}{% endblock %}
 {% block content %}
-<p class="small"><a href="/app/clients/{{ client.id }}#bevindingen">← {{ client.company_name }}</a>{% if user.is_staff %} · <a href="/app/review?client_id={{ client.id }}">wachtrij</a>{% endif %}</p>
-<h1>{{ a.title }}</h1>
-<div class="actions mb">{{ cls(a.classification) }} {{ conf(a.confidence) }} {{ rstatus(a.review_status) }}{% if a.requires_verification %}<span class="badge b-MEDIUM">Verificatie vereist</span>{% endif %}{% if a.is_stale %}<span class="badge b-LOW">Niet meer gereproduceerd</span>{% endif %}{% if a.case_id %}<a class="badge b-status" href="/app/cases/{{ a.case_id }}">In dossier</a>{% endif %}</div>
-{% if a.classification.value == 'ANOMALY' %}<p class="notice">Dit is een afwijking, geen bewijs van een factuurfout. Er is geen bedrag aan gekoppeld zolang het niet met brondocumenten is onderbouwd.</p>{% endif %}
-<div class="grid grid-2">
-  <div class="card">
-    <h2>Toelichting</h2>
-    <p>{{ a.description }}</p>
-    <p class="small muted">Reden van detectie: {{ a.reason }}</p>
-    <dl class="meta mt">
-      <dt>Gefactureerd / werkelijk</dt><dd>{{ value(a.actual_value, a.unit) }}</dd>
-      <dt>Verwacht</dt><dd>{{ value(a.expected_value, a.unit) }}</dd>
-      <dt>Verschil</dt><dd>{{ value(a.difference, a.unit) }}</dd>
-      <dt>Mogelijke terugvordering</dt><dd><strong>{{ a.potential_recovery|eur }}</strong> <span class="small muted">(excl. btw; verificatie vereist)</span></dd>
-      {% if a.invoice %}<dt>Factuur</dt><dd><a href="/app/invoices/{{ a.invoice.id }}">{{ a.invoice.label }}</a> · {{ a.invoice.period or '' }} · {{ a.invoice.ean or '' }}</dd>{% endif %}
-      <dt>Regel</dt><dd class="mono">{{ a.rule_id }} v{{ a.rule_version }}</dd>
-      <dt>Gedetecteerd</dt><dd>{{ a.created_at|d }}</dd>
-    </dl>
-    <h3>Berekening</h3>
-    <ol class="calc">{% for step in a.calculation %}<li>{{ step }}</li>{% else %}<li>Geen berekening (kwalitatieve bevinding).</li>{% endfor %}</ol>
-  </div>
-  <div class="card">
-    <h2>Bewijs</h2>
-    <ul class="evidence">{% for e in evidence %}
-      <li><strong>{{ e.label }}</strong>
-        {% if e.source_text %}<span class="source-text">{{ e.source_text }}</span>{% endif %}
-        {% if e.page_url %}<a class="btn small secondary mt" href="{{ e.page_url }}">Toon factuurpagina</a>{% elif e.doc_url %}<a class="btn small secondary mt" href="{{ e.doc_url }}">Toon bron{% if e.row %} (rij {{ e.row }}){% endif %}</a>{% endif %}
-        {% if e.kind == 'contract_price' %}<span class="small muted">{{ 'contract geverifieerd' if e.verified else 'contract nog niet geverifieerd' }}</span>{% endif %}
-      </li>{% else %}<li class="muted">Geen bronverwijzingen.</li>{% endfor %}</ul>
-  </div>
-</div>
-{% if user.is_staff %}
-<div class="card">
-  <h2>Beoordeling</h2>
-  {% if a.review_notes %}<pre class="letter">{{ a.review_notes }}</pre>{% endif %}
-  <form method="post" action="/app/anomalies/{{ a.id }}/review">{{ csrf_field() }}
-    <label for="note">Toelichting (verplicht bij afwijzen, duplicaat en informatieverzoek)</label><textarea id="note" name="note"></textarea>
-    {% if siblings %}<label for="duplicate_of">Duplicaat van</label><select id="duplicate_of" name="duplicate_of"><option value="">—</option>{% for s in siblings %}<option value="{{ s.id }}">{{ s.title }}</option>{% endfor %}</select>{% endif %}
-    <div class="actions mt">
-      <button class="btn" name="action" value="confirm" type="submit">Bevestigen</button>
-      <button class="btn secondary" name="action" value="investigate" type="submit">Onderzoeken</button>
-      <button class="btn secondary" name="action" value="request_info" type="submit">Informatie opvragen</button>
-      <button class="btn secondary" name="action" value="duplicate" type="submit">Duplicaat</button>
-      <button class="btn secondary" name="action" value="resolve" type="submit">Opgelost</button>
-      <button class="btn danger" name="action" value="reject" type="submit">Afwijzen</button>
-      {% if a.review_status.value != 'OPEN' %}<button class="btn secondary" name="action" value="reopen" type="submit">Heropenen</button>{% endif %}
+{% set crumbs = ([('Beoordelen', '/app/review')] if user.is_staff else []) + [(client.company_name, '/app/clients/' ~ client.id ~ '?tab=bevindingen')] %}
+<div class="page page-wide">
+  {{ ui.page_head(a.title, None, crumbs) }}
+  <div class="split">
+    {{ src.source_pane(source, '/app/anomalies/' ~ a.id) }}
+
+    <div class="analysis">
+      <section class="panel">
+        <div class="verdict">
+          <div class="row">{{ ui.chip(v.kind, v.kind_class) }}{{ ui.chip(v.status_label, v.status_class) }}{{ ui.conf(a.confidence) }}{% if a.is_stale %}{{ ui.chip('Niet meer gereproduceerd', 'quiet', 'De laatste analyse vond deze afwijking niet meer, bijvoorbeeld na een correctie van de gegevens') }}{% endif %}</div>
+          {% if a.potential_recovery > 0 %}
+          <div><div class="label">Mogelijke terugvordering</div><div class="big" data-countup="{{ a.potential_recovery }}" data-prefix="€ ">{{ a.potential_recovery|eur }}</div></div>
+          {% else %}<div class="big muted">{{ 'Signaal zonder bedrag' if a.classification.value == 'ANOMALY' else 'Geen terugvordering' }}</div>{% endif %}
+          <p class="headline">{{ v.sentence }}</p>
+          {% if a.actual_value is not none and a.expected_value is not none %}
+          <div class="compare">
+            <div><span class="label">Gefactureerd</span><span class="v">{{ fmt_value(a.actual_value, a.unit) }}</span></div>
+            <div><span class="label">Verwacht</span><span class="v">{{ fmt_value(a.expected_value, a.unit) }}</span></div>
+            <div class="d"><span class="label">Verschil</span><span class="v">{{ fmt_value(a.difference, a.unit) }}</span></div>
+          </div>
+          {% endif %}
+          {% if a.classification.value == 'ANOMALY' %}<div class="alert info">{{ icon('info') }}<span>Dit is een signaal, geen bewijs van een factuurfout. Er hoort geen bedrag bij zolang het niet met brondocumenten is onderbouwd.</span></div>{% endif %}
+        </div>
+      </section>
+
+      <section class="panel panel-pad">
+        <ol class="spoor">
+          <li><span class="node on"></span><div class="step-label">Bron</div>
+            <div class="evidence">{% for e in evidence %}
+              <div class="ev" id="{{ e.id }}"{% if e.box_id %} data-hl="{{ e.box_id }}" data-page="{{ e.page }}" data-href="/app/anomalies/{{ a.id }}?doc={{ e.document_id }}&page={{ e.page }}" tabindex="0"{% endif %}>
+                <span class="ev-icon">{{ icon(ev_icon.get(e.kind, 'doc')) }}</span>
+                <span><b>{{ e.label }}</b>{% if e.source_text %}<span class="quote">{{ e.source_text }}</span>{% endif %}
+                  {% if e.kind == 'contract_price' %}<span class="small {{ 'muted' if e.verified else '' }}">{{ 'Contract geverifieerd' if e.verified else 'Contract nog niet geverifieerd' }}</span>{% endif %}</span>
+                {% if e.page_url %}<a class="btn btn-sm btn-ghost" href="/app/anomalies/{{ a.id }}?doc={{ e.document_id }}&page={{ e.page }}">p. {{ e.page }}</a>{% elif e.doc_url %}<a class="btn btn-sm btn-ghost" href="{{ e.doc_url }}">{% if e.row %}rij {{ e.row }}{% else %}bron{% endif %}</a>{% endif %}
+              </div>{% else %}<p class="small muted">Geen directe bronverwijzing; zie de analyse hieronder.</p>{% endfor %}</div>
+          </li>
+          <li><span class="node on"></span><div class="step-label">Analyse</div>
+            <p>{{ a.description }}</p>
+            <p class="small muted">Waarom gesignaleerd: {{ a.reason }}</p>
+          </li>
+          <li><span class="node on"></span><div class="step-label">Berekening</div>
+            {% if a.calculation %}<ol class="calc">{% for step in a.calculation %}<li{% if loop.last %} class="result"{% endif %}>{{ step }}</li>{% endfor %}</ol>
+            {% else %}<p class="small muted">Kwalitatieve bevinding zonder berekening.</p>{% endif %}
+          </li>
+          <li><span class="node {{ 'done' if a.review_status.value == 'CONFIRMED' else 'warn' }}"></span><div class="step-label">Conclusie</div>
+            <p>{% if a.review_status.value == 'CONFIRMED' %}Bevestigd na beoordeling{% if a.potential_recovery > 0 %}: {{ a.potential_recovery|eur }} (excl. btw) komt in aanmerking voor een correctieverzoek{% endif %}.{% elif a.potential_recovery > 0 %}Mogelijke discrepantie van {{ a.potential_recovery|eur }} (excl. btw). Verificatie vereist voordat dit als vordering geldt.{% else %}Geen bedrag; alleen ter informatie of voor nader onderzoek.{% endif %}</p>
+            <p class="small muted">Regel <span class="tag">{{ a.rule_id }} v{{ a.rule_version }}</span> · gedetecteerd {{ a.created_at|d }}{% if a.case_id %} · <a href="/app/cases/{{ a.case_id }}">in dossier</a>{% endif %}</p>
+          </li>
+        </ol>
+        {% if user.is_staff %}
+        <div class="decide" id="beoordeling">
+          {% if a.review_notes %}<div class="history">{{ a.review_notes }}</div>{% endif %}
+          <form method="post" action="/app/anomalies/{{ a.id }}/review" class="stack">
+            {{ ui.csrf_field() }}
+            <div class="field"><label for="note">Toelichting <span class="muted">(verplicht bij afwijzen, duplicaat en informatie opvragen)</span></label><textarea id="note" name="note" placeholder="Bijv. gecontroleerd tegen contract pagina 2."></textarea></div>
+            {% if siblings %}<div class="field"><label for="duplicate_of">Duplicaat van</label><select id="duplicate_of" name="duplicate_of"><option value="">Kies een bevinding</option>{% for s in siblings %}<option value="{{ s.id }}">{{ s.title }}</option>{% endfor %}</select></div>{% endif %}
+            <div class="row-between">
+              <div class="actions">
+                {% if a.review_status.value != 'CONFIRMED' %}<button class="btn btn-positive" name="action" value="confirm" type="submit">{{ icon('check') }}Bevestigen</button>{% endif %}
+                <button class="btn" name="action" value="investigate" type="submit">Onderzoeken</button>
+                <button class="btn" name="action" value="request_info" type="submit">Informatie opvragen</button>
+              </div>
+              <div class="actions">
+                {% if siblings %}<button class="btn btn-ghost" name="action" value="duplicate" type="submit">Duplicaat</button>{% endif %}
+                <button class="btn btn-ghost" name="action" value="resolve" type="submit">Opgelost</button>
+                {% if a.review_status.value != 'OPEN' %}<button class="btn btn-ghost" name="action" value="reopen" type="submit">Heropenen</button>{% endif %}
+                <button class="btn btn-danger" name="action" value="reject" type="submit">Afwijzen</button>
+              </div>
+            </div>
+          </form>
+        </div>
+        {% endif %}
+      </section>
     </div>
-  </form>
+  </div>
 </div>
-{% endif %}
 {% endblock %}

@@ -15,6 +15,7 @@ from app.detection.base import (
     invoice_quality,
     invoice_ref,
     line_evidence,
+    upper_first,
 )
 from app.domain.confidence import EvidenceQuality, confidence_from_evidence
 from app.domain.enums import Classification, Commodity, LineCategory
@@ -196,7 +197,7 @@ def detect_outside_contract_period(ctx: AnalysisContext) -> list[Finding]:
             confidence=confidence_from_evidence([EvidenceQuality.DERIVED]),
             title=f"Factuurperiode valt (deels) buiten de contractperiode ({inv.label})",
             description=(
-                f"{invoice_ref(inv).capitalize()} beslaat {period.days} dagen, waarvan {uncovered} dagen niet "
+                f"{upper_first(invoice_ref(inv))} beslaat {period.days} dagen, waarvan {uncovered} dagen niet "
                 f"binnen een vastgelegd contract met {inv.supplier} vallen. Controleer welk tarief voor die dagen "
                 "is toegepast (bijv. variabel tarief na afloop van het contract) en of er een verlenging is."
             ),

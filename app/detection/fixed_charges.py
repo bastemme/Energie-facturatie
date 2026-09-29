@@ -28,6 +28,13 @@ MIN_DAY_TOLERANCE = Decimal("1")
 RELATIVE_TOLERANCE = Decimal("0.10")
 
 
+def time_unit_nl(unit: str, quantity: Decimal) -> str:
+    one = quantity == 1
+    if unit == "month":
+        return "maand" if one else "maanden"
+    return "dag" if one else "dagen"
+
+
 def detect_fixed_charge_quantity(ctx: AnalysisContext) -> list[Finding]:
     findings: list[Finding] = []
     for inv in ctx.active_invoices:
@@ -48,24 +55,25 @@ def detect_fixed_charge_quantity(ctx: AnalysisContext) -> list[Finding]:
             diff = (line.amount or round_cents(line.quantity * line.unit_price)) - expected_amount
             if abs(diff) <= ctx.settings.line_amount_tolerance:
                 continue
-            unit_nl = "maanden" if unit == "month" else "dagen"
             findings.append(Finding(
                 rule_id=RULE, rule_version="1.0", category="fixed_charge",
                 classification=Classification.POTENTIAL_ERROR,
                 confidence=confidence_from_evidence([invoice_quality(inv, line), EvidenceQuality.DERIVED],
                                                     extraction_confidence=line.confidence),
-                title=f"Vaste kosten voor meer {unit_nl} dan de factuurperiode ({inv.label})",
+                title=f"Vaste kosten voor meer {time_unit_nl(unit, Decimal(2))} dan de factuurperiode ({inv.label})",
                 description=(
-                    f"'{line.description}' op {invoice_ref(inv)} rekent {format_decimal_nl(line.quantity)} {unit_nl}, "
+                    f"'{line.description}' op {invoice_ref(inv)} rekent {format_decimal_nl(line.quantity)} "
+                    f"{time_unit_nl(unit, line.quantity)}, "
                     f"terwijl de periode {period} ({period.days} dagen) overeenkomt met "
-                    f"{format_decimal_nl(expected_qty.quantize(Decimal('0.01')))} {unit_nl}. "
+                    f"{format_decimal_nl(expected_qty.quantize(Decimal('0.01')))} {time_unit_nl(unit, expected_qty)}. "
                     f"Mogelijke discrepantie: {eur(diff)}."
                 ),
                 reason="Aantal gefactureerde tijdseenheden ≠ lengte van de factuurperiode.",
                 invoice=inv, line=line, actual=line.amount, expected=expected_amount, difference=diff,
                 potential_recovery=diff * charge_sign(inv),
                 calculation=[
-                    f"Periode {period}: {format_decimal_nl(expected_qty.quantize(Decimal('0.0001')))} {unit_nl}",
+                    f"Periode {period}: {format_decimal_nl(expected_qty.quantize(Decimal('0.0001')))} "
+                    f"{time_unit_nl(unit, expected_qty)}",
                     f"Verwacht: {format_decimal_nl(expected_qty.quantize(Decimal('0.0001')))} × € "
                     f"{format_price(line.unit_price)} = {eur(expected_amount)}",
                     f"Gefactureerd: {eur(line.amount)}", f"Verschil: {eur(diff)}",

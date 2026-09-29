@@ -1,13 +1,18 @@
 {% extends "app_base.html" %}
 {% block title %}Klanten{% endblock %}
 {% block content %}
-<div class="actions mb"><h1>Klanten</h1><a class="btn" href="/app/clients/new">Nieuwe klant</a></div>
-<div class="table-wrap"><table>
-  <tr><th>Bedrijf</th><th>KvK</th><th class="num">Facturen</th><th class="num">Mogelijk</th><th class="num">Bevestigd</th><th class="num">Teruggevorderd</th><th class="num">Fee %</th></tr>
-  {% for c in clients %}{% set s = summaries[c.id] %}
-  <tr><td><a href="/app/clients/{{ c.id }}">{{ c.company_name }}</a></td><td>{{ c.kvk_number or '—' }}</td>
-    <td class="num">{{ s.invoices_analyzed }}</td><td class="num">{{ s.potential_discrepancies|eur }}</td>
-    <td class="num">{{ s.confirmed_discrepancies|eur }}</td><td class="num">{{ s.recovered|eur }}</td><td class="num">{{ c.success_fee_percentage|nl }}</td></tr>
-  {% else %}<tr><td colspan="7" class="muted">Nog geen klanten.</td></tr>{% endfor %}
-</table></div>
+<div class="page">
+  {% call ui.page_head('Klanten', clients|length ~ ' klant(en)') %}<a class="btn btn-primary" href="/app/clients/new">{{ icon('plus') }}Nieuwe klant</a>{% endcall %}
+  <section class="panel">
+    {% if clients %}
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Klant</th><th class="r">Facturen</th><th class="r">Mogelijk</th><th class="r">Bevestigd</th><th class="r">Teruggevorderd</th><th class="r">Fee</th></tr></thead>
+      <tbody>{% for c in clients %}{% set s = summaries[c.id] %}<tr>
+        <td><a class="primary" href="/app/clients/{{ c.id }}">{{ c.company_name }}</a><span class="sub">{% if c.kvk_number %}KvK {{ c.kvk_number }} · {% endif %}{{ c.success_fee_percentage|nl }}% succesvergoeding</span></td>
+        <td class="r num" data-label="Facturen">{{ s.invoices_analyzed }}</td><td class="r num" data-label="Mogelijk">{{ s.potential_discrepancies|eur }}</td>
+        <td class="r num" data-label="Bevestigd">{{ s.confirmed_discrepancies|eur }}</td><td class="r num" data-label="Teruggevorderd"><b>{{ s.recovered|eur }}</b></td><td class="r num" data-label="Fee">{{ s.success_fee|eur }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{% call ui.empty('clients', 'Nog geen klanten', 'Maak een klant aan vanuit een lead of direct. U legt daarbij de machtiging en het afgesproken percentage vast.') %}<a class="btn btn-primary" href="/app/clients/new">{{ icon('plus') }}Nieuwe klant</a>{% endcall %}{% endif %}
+  </section>
+</div>
 {% endblock %}

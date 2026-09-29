@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal
 
-from app.detection.base import AnalysisContext, Detector, Finding, eur, invoice_field_evidence, invoice_ref
+from app.detection.base import AnalysisContext, Detector, Finding, eur, invoice_field_evidence, invoice_ref, upper_first
 from app.domain.confidence import EvidenceQuality, confidence_from_evidence
 from app.domain.enums import Classification
 from app.domain.money import ZERO, format_decimal_nl, round_cents
@@ -66,7 +66,7 @@ def detect_overlaps(ctx: AnalysisContext) -> list[Finding]:
                     confidence=confidence_from_evidence([EvidenceQuality.DERIVED]),
                     title=f"Overlappende factuurperiodes voor aansluiting {conn} ({a.label} / {b.label})",
                     description=(
-                        f"{invoice_ref(a).capitalize()} ({a.supplier}) en {invoice_ref(b)} ({b.supplier}) overlappen "
+                        f"{upper_first(invoice_ref(a))} ({a.supplier}) en {invoice_ref(b)} ({b.supplier}) overlappen "
                         f"{overlap.days} dagen ({overlap}). Voor deze dagen is mogelijk dubbel gefactureerd"
                         + (" door twee verschillende leveranciers (mogelijk overstapfout)" if multi else "")
                         + f". Voorzichtige schatting op basis van vaste kosten van {b.label}: {eur(estimate)}. "

@@ -1,78 +1,63 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import csrf_field, conf, cls, rstatus, verified with context %}
+{% import "_source.html" as src with context %}
 {% block title %}Factuur {{ inv.label }}{% endblock %}
-{% macro src(name) %}{% set p = provenance.get(name) %}{% if p %}<span class="small muted" title="{{ p.raw_text or '' }}">{{ p.method.value }}{% if p.page %} · p.{{ p.page }}{% endif %}{% if p.row_number %} · rij {{ p.row_number }}{% endif %}{% if p.page and p.bbox and doc %} · <a href="/app/documents/{{ doc.id }}/view/{{ p.page }}?hl={{ p.bbox|join(',') }}">toon</a>{% endif %}</span>{% endif %}{% endmacro %}
 {% block content %}
-<p class="small"><a href="/app/clients/{{ inv.client_id }}#facturen">← terug naar klant</a>{% if doc %} · bron: <a href="/app/documents/{{ doc.id }}">{{ doc.original_filename }}</a>{% endif %}</p>
-<div class="actions"><h1>{{ 'Creditnota' if inv.invoice_type.value == 'CREDIT_NOTE' else 'Factuur' }} {{ inv.label }}</h1> {{ verified(inv.is_verified) }}</div>
-{% if not inv.is_verified %}<p class="notice">De gegevens hieronder zijn {% if inv.extraction_confidence is not none %}automatisch uitgelezen (zekerheid {{ inv.extraction_confidence|pct }}){% else %}nog niet gecontroleerd{% endif %}. Controleer ze tegen het brondocument en markeer ze daarna als geverifieerd. Bevindingen op niet-geverifieerde PDF-gegevens krijgen maximaal zekerheid "Middel".</p>{% endif %}
+{% set crumbs = ([('Klanten', '/app/clients')] if user.is_staff else []) + [(client.company_name, '/app/clients/' ~ client.id ~ '?tab=facturen')] %}
+<div class="page page-wide">
+  {% call ui.page_head(('Creditnota ' if inv.invoice_type.value == 'CREDIT_NOTE' else 'Factuur ') ~ inv.label, (inv.supplier or 'Leverancier onbekend') ~ (' · ' ~ inv.period if inv.period else ''), crumbs) %}
+    {{ ui.verified(inv.is_verified) }}
+    {% if user.is_staff %}
+      <a class="btn" href="/app/invoices/{{ inv.id }}/edit">{{ icon('edit') }}Gegevens corrigeren</a>
+      {% if not inv.is_verified %}<form method="post" action="/app/invoices/{{ inv.id }}/verify" class="inline">{{ ui.csrf_field() }}<button class="btn btn-primary" type="submit" data-tip="Alle kopgegevens en regels zijn gecontroleerd tegen het brondocument">{{ icon('check') }}Markeer als geverifieerd</button></form>{% endif %}
+    {% endif %}
+  {% endcall %}
+  {% if not inv.is_verified and user.is_staff %}<div class="alert review">{{ icon('info') }}<span><b>Automatisch uitgelezen{% if inv.extraction_confidence is not none %} (zekerheid {{ inv.extraction_confidence|pct }}){% endif %}.</b> Controleer de gegevens tegen het document. Bevindingen op niet-geverifieerde PDF-gegevens krijgen maximaal zekerheid "Middel".</span></div>{% endif %}
 
-{% if user.is_staff %}
-<form method="post" action="/app/invoices/{{ inv.id }}" class="card">
-  {{ csrf_field() }}
-  <h2>Kopgegevens</h2>
-  <div class="form-row">
-    <div><label>Leverancier {{ src('supplier') }}</label><input name="supplier" type="text" value="{{ inv.supplier or '' }}"></div>
-    <div><label>Factuurnummer {{ src('invoice_number') }}</label><input name="invoice_number" type="text" value="{{ inv.invoice_number or '' }}"></div>
-    <div><label>Type</label><select name="invoice_type">{% for t in invoice_types %}<option value="{{ t.value }}" {% if t == inv.invoice_type %}selected{% endif %}>{{ t.value }}</option>{% endfor %}</select></div>
-    <div><label>Corrigeert factuur {{ src('corrects_invoice_number') }}</label><input name="corrects_invoice_number" type="text" value="{{ inv.corrects_invoice_number or '' }}"></div>
-  </div>
-  <div class="form-row">
-    <div><label>Factuurdatum {{ src('invoice_date') }}</label><input name="invoice_date" type="text" placeholder="dd-mm-jjjj" value="{{ inv.invoice_date|d if inv.invoice_date else '' }}"></div>
-    <div><label>Periode van {{ src('billing_period_start') }}</label><input name="billing_period_start" type="text" placeholder="dd-mm-jjjj" value="{{ inv.billing_period_start|d if inv.billing_period_start else '' }}"></div>
-    <div><label>Periode t/m</label><input name="billing_period_end" type="text" placeholder="dd-mm-jjjj" value="{{ inv.billing_period_end|d if inv.billing_period_end else '' }}"></div>
-    <div><label>Product</label><select name="commodity">{% for t in commodities %}<option value="{{ t.value }}" {% if t == inv.commodity %}selected{% endif %}>{{ t.value }}</option>{% endfor %}</select></div>
-  </div>
-  <div class="form-row">
-    <div><label>EAN {{ src('ean') }}</label><input name="ean" type="text" value="{{ inv.ean or '' }}"></div>
-    <div><label>Meternummer {{ src('meter_number') }}</label><input name="meter_number" type="text" value="{{ inv.meter_number or '' }}"></div>
-  </div>
-  <div class="form-row">
-    <div><label>Subtotaal excl. btw {{ src('subtotal_excl_vat') }}</label><input name="subtotal_excl_vat" type="text" value="{{ inv.subtotal_excl_vat|nl if inv.subtotal_excl_vat is not none else '' }}"></div>
-    <div><label>Btw % {{ src('vat_rate') }}</label><input name="vat_rate" type="text" value="{{ inv.vat_rate|nl if inv.vat_rate is not none else '' }}"></div>
-    <div><label>Btw-bedrag {{ src('vat_amount') }}</label><input name="vat_amount" type="text" value="{{ inv.vat_amount|nl if inv.vat_amount is not none else '' }}"></div>
-    <div><label>Totaal incl. btw {{ src('total_incl_vat') }}</label><input name="total_incl_vat" type="text" value="{{ inv.total_incl_vat|nl if inv.total_incl_vat is not none else '' }}"></div>
-  </div>
-  <h2>Factuurregels</h2>
-  <div class="table-wrap"><table>
-    <tr><th>Omschrijving</th><th>Categorie</th><th>Hoeveelheid</th><th>Eenheid</th><th>Tarief</th><th>Bedrag</th><th>Btw %</th><th>Bron</th><th>Verw.</th></tr>
-    {% for l in inv.lines %}{% set p = 'line-' ~ l.id ~ '-' %}
-    <tr>
-      <td><input name="{{ p }}description" type="text" value="{{ l.description }}"></td>
-      <td><select name="{{ p }}category">{% for c in categories %}<option value="{{ c.value }}" {% if c == l.category %}selected{% endif %}>{{ c.value }}</option>{% endfor %}</select></td>
-      <td><input name="{{ p }}quantity" type="text" value="{{ l.quantity|nl if l.quantity is not none else '' }}"></td>
-      <td><input name="{{ p }}unit" type="text" value="{{ l.unit or '' }}"></td>
-      <td><input name="{{ p }}unit_price" type="text" value="{{ l.unit_price|nl if l.unit_price is not none else '' }}"></td>
-      <td><input name="{{ p }}amount" type="text" value="{{ l.amount|nl if l.amount is not none else '' }}"></td>
-      <td><input name="{{ p }}vat_rate" type="text" value="{{ l.vat_rate|nl if l.vat_rate is not none else '' }}"></td>
-      <td class="small">{{ l.extraction_method.value }}{% if l.source_page and doc %}<br><a href="/app/documents/{{ doc.id }}/view/{{ l.source_page }}?hl={{ (l.source_bbox or [])|join(',') }}">p.{{ l.source_page }}</a>{% elif l.source_row %}<br>rij {{ l.source_row }}{% endif %}</td>
-      <td><input type="checkbox" name="{{ p }}delete" title="Verwijderen"></td>
-    </tr>{% endfor %}
-    <tr>
-      <td><input name="new-description" type="text" placeholder="Nieuwe regel…"></td>
-      <td><select name="new-category"><option value="">Automatisch</option>{% for c in categories %}<option value="{{ c.value }}">{{ c.value }}</option>{% endfor %}</select></td>
-      <td><input name="new-quantity" type="text"></td><td><input name="new-unit" type="text"></td><td><input name="new-unit_price" type="text"></td>
-      <td><input name="new-amount" type="text"></td><td><input name="new-vat_rate" type="text"></td><td class="small">MANUAL</td><td></td>
-    </tr>
-  </table></div>
-  <p class="small muted">Getallen in Nederlandse notatie (1.234,56). Elke wijziging wordt vastgelegd in het auditlog en maakt eerdere verificatie ongedaan.</p>
-  <div class="actions mt"><button class="btn" type="submit">Wijzigingen opslaan</button></div>
-</form>
-<form method="post" action="/app/invoices/{{ inv.id }}/verify" class="card">{{ csrf_field() }}
-  <p>Ik heb alle kopgegevens en regels gecontroleerd tegen het brondocument.</p>
-  <button class="btn secondary" type="submit">Markeer als geverifieerd</button>
-</form>
-{% else %}
-<div class="card"><dl class="meta">
-  <dt>Leverancier</dt><dd>{{ inv.supplier or '—' }}</dd><dt>Periode</dt><dd>{{ inv.period or '—' }}</dd><dt>EAN</dt><dd>{{ inv.ean or '—' }}</dd>
-  <dt>Totaal incl. btw</dt><dd>{{ inv.total_incl_vat|eur }}</dd></dl></div>
-{% endif %}
+  <div class="split">
+    {{ src.source_pane(source, '/app/invoices/' ~ inv.id) }}
+    <div class="analysis">
+      <section class="panel">
+        <div class="panel-body">
+          <dl class="dl">
+            <dt>Factuurnummer</dt><dd>{{ inv.invoice_number or '—' }}{% if inv.corrects_invoice_number %} <span class="muted">· corrigeert {{ inv.corrects_invoice_number }}</span>{% endif %}</dd>
+            <dt>Factuurdatum</dt><dd class="num">{{ inv.invoice_date|d }}</dd>
+            <dt>Periode</dt><dd class="num">{{ inv.period or '—' }}{% if inv.period %} <span class="muted">({{ inv.period.days }} dagen)</span>{% endif %}</dd>
+            <dt>Aansluiting</dt><dd><span class="tag">{{ inv.ean or 'EAN onbekend' }}</span>{% if inv.meter_number %} <span class="muted small">meter {{ inv.meter_number }}</span>{% endif %}</dd>
+            <dt>Subtotaal excl. btw</dt><dd class="num">{{ inv.subtotal_excl_vat|eur }}</dd>
+            <dt>Btw</dt><dd class="num">{{ inv.vat_amount|eur }}{% if inv.vat_rate is not none %} <span class="muted">({{ inv.vat_rate|nl }}%)</span>{% endif %}</dd>
+            <dt>Totaal incl. btw</dt><dd class="num"><b>{{ inv.total_incl_vat|eur }}</b></dd>
+          </dl>
+        </div>
+      </section>
 
-{% if readings %}
-<h2>Meterstanden op deze factuur</h2>
-<ul>{% for r in readings %}<li>{{ r.register }} {{ r.reading_date|d }}: {{ r.reading|nl }} {{ r.unit }} ({{ r.reading_type.value }}){% if r.multiplier != 1 %} × {{ r.multiplier|nl }}{% endif %}</li>{% endfor %}</ul>
-{% endif %}
+      <section class="section">
+        <div class="section-head"><h2>Bevindingen <span class="muted">{{ anomalies|length }}</span></h2></div>
+        {% if anomalies %}<div class="findings">{% for a in anomalies %}{{ ui.finding_card(a, '/app/invoices/' ~ inv.id) }}{% endfor %}</div>
+        {% else %}<div class="panel">{{ ui.empty('check-circle', 'Geen afwijkingen gevonden', 'Alle controles op deze factuur zijn doorlopen zonder bevindingen.' if user.is_staff else 'Er zijn voor deze factuur geen bevestigde afwijkingen.') }}</div>{% endif %}
+      </section>
 
-<h2>Bevindingen op deze factuur</h2>
-<ul>{% for a in anomalies %}<li><a href="/app/anomalies/{{ a.id }}">{{ a.title }}</a> {{ cls(a.classification) }} {{ conf(a.confidence) }} {{ rstatus(a.review_status) }} — {{ a.potential_recovery|eur }}</li>{% else %}<li class="muted">Geen.</li>{% endfor %}</ul>
+      <section class="panel">
+        <div class="panel-head"><div><h2>Uitgelezen regels</h2><p>Beweeg over een regel om te zien waar die op de factuur staat.</p></div></div>
+        {% if inv.lines %}
+        <div class="table-wrap"><table class="table table-compact">
+          <thead><tr><th>Omschrijving</th><th class="r">Hoeveelheid</th><th class="r">Tarief</th><th class="r">Bedrag</th></tr></thead>
+          <tbody>{% for l in inv.lines %}<tr{% if l.source_bbox and source and l.source_page == source.page %} data-hl="ln-{{ l.id }}" tabindex="0"{% endif %}>
+            <td>{% if l.id in flagged %}<span class="line-flag" aria-label="Bevinding"></span>{% endif %}<span class="primary">{{ l.description }}</span><span class="sub">{{ l.category|cat }}{% if l.source_page %} · p. {{ l.source_page }}{% elif l.source_row %} · rij {{ l.source_row }}{% endif %}</span></td>
+            <td class="r num">{{ (l.quantity|nl ~ ' ' ~ (l.unit|unit)) if l.quantity is not none else '—' }}</td>
+            <td class="r num">{{ l.unit_price|price }}</td>
+            <td class="r num">{{ l.amount|eur }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+        {% else %}{% call ui.empty('row', 'Geen regels uitgelezen', 'Voer de factuurregels handmatig in om de controles te kunnen uitvoeren.') %}{% if user.is_staff %}<a class="btn btn-primary" href="/app/invoices/{{ inv.id }}/edit">{{ icon('edit') }}Regels invoeren</a>{% endif %}{% endcall %}{% endif %}
+      </section>
+
+      {% if readings %}
+      <section class="panel">
+        <div class="panel-head"><h2>Meterstanden op deze factuur</h2></div>
+        <div class="table-wrap"><table class="table table-compact"><tbody>{% for r in readings %}<tr><td>{{ {'NORMAL':'Normaal','LOW':'Dal','SINGLE':'Enkel','GAS':'Gas','FEED_IN':'Teruglevering'}.get(r.register, r.register) }}</td><td class="num">{{ r.reading_date|d }}</td><td class="r num">{{ r.reading|nl }} {{ r.unit }}{% if r.multiplier != 1 %} × {{ r.multiplier|nl }}{% endif %}</td><td class="r">{{ ui.chip('Geschat', 'review') if r.reading_type.value == 'ESTIMATED' else (ui.chip('Werkelijk', 'positive') if r.reading_type.value == 'ACTUAL' else ui.chip('Onbekend', 'quiet')) }}</td></tr>{% endfor %}</tbody></table></div>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+  {{ ui.review_dialog('/app/invoices/' ~ inv.id) }}
+</div>
 {% endblock %}

@@ -1,5 +1,12 @@
 {% extends "app_base.html" %}
 {% block title %}{{ title }}{% endblock %}
-{% block content %}
-<div class="card narrow"><h1>{{ title }}</h1>{% if detail %}<p>{{ detail }}</p>{% endif %}<p><a href="/app">Terug naar het overzicht</a></p></div>
-{% endblock %}
+{% macro box() %}
+<div class="panel">
+  {% call ui.empty(ico or 'alert', title, detail or 'Deze pagina bestaat niet (meer), of u heeft er geen toegang toe.') %}
+    {% if retry %}<a class="btn" href="{{ retry }}">Opnieuw proberen</a>{% endif %}
+    <a class="btn btn-primary" href="{{ '/app' if user else '/' }}">{{ 'Naar het overzicht' if user else 'Naar de homepage' }}</a>
+  {% endcall %}
+</div>
+{% endmacro %}
+{% block content %}<div class="page">{{ box() }}</div>{% endblock %}
+{% block bare %}<div class="auth-main">{{ box() }}</div>{% endblock %}

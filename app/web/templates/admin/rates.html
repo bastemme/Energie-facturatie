@@ -1,32 +1,40 @@
 {% extends "app_base.html" %}
-{% from "_macros.html" import csrf_field, verified with context %}
 {% block title %}Referentietarieven{% endblock %}
 {% block content %}
-<h1>Referentietarieven</h1>
-<p class="notice">Wettelijke tarieven (btw, energiebelasting) zijn tijdsafhankelijk. Het systeem levert <strong>geen</strong> tarieven mee. Voer elk tarief in vanuit de officiële bron (bijv. Belastingdienst) met bronvermelding. Alleen geverifieerde tarieven worden in controles gebruikt; bevindingen vermelden welk tarief is gebruikt.</p>
-<div class="table-wrap"><table>
-  <tr><th>Soort</th><th>Schijf</th><th class="num">Tarief</th><th>Eenheid</th><th>Geldig</th><th>Bron</th><th>Status</th><th></th></tr>
-  {% for r in rates %}<tr><td>{{ r.kind.value }}</td><td>{{ r.bracket_from|nl if r.bracket_from is not none else '' }} – {{ r.bracket_to|nl if r.bracket_to is not none else '' }}</td><td class="num">{{ r.rate|nl }}</td><td>{{ r.unit }}</td><td>{{ r.valid_from|d }} – {{ r.valid_to|d }}</td><td class="small">{{ r.source_reference }}</td><td>{{ verified(r.verified_at) }}</td>
-  <td>{% if not r.verified_at and user.role.value == 'ADMIN' %}<form method="post" action="/app/reference-rates/{{ r.id }}/verify" class="inline">{{ csrf_field() }}<button class="btn small secondary" type="submit">Verifiëren</button></form>{% endif %}</td></tr>
-  {% else %}<tr><td colspan="8" class="muted">Nog geen tarieven ingevoerd. Belastingcontroles worden overgeslagen.</td></tr>{% endfor %}
-</table></div>
-{% if user.role.value == 'ADMIN' %}
-<form method="post" action="/app/reference-rates" class="card mt">{{ csrf_field() }}
-  <h3>Tarief toevoegen</h3>
-  <div class="form-row">
-    <div><label>Soort</label><select name="kind">{% for k in kinds %}<option value="{{ k.value }}">{{ k.value }}</option>{% endfor %}</select></div>
-    <div><label>Tarief</label><input name="rate" type="text" required placeholder="bijv. 21 (btw %) of 0,12345 (€/kWh)"></div>
-    <div><label>Eenheid</label><select name="unit"><option value="percent">percent</option><option>kWh</option><option>m3</option></select></div>
-  </div>
-  <div class="form-row">
-    <div><label>Schijf vanaf (verbruik/jaar)</label><input name="bracket_from" type="text"></div>
-    <div><label>Schijf tot</label><input name="bracket_to" type="text"></div>
-    <div><label>Geldig vanaf</label><input name="valid_from" type="date" required></div>
-    <div><label>Geldig t/m</label><input name="valid_to" type="date"></div>
-  </div>
-  <label>Bron (URL of wetsartikel) *</label><input name="source_reference" type="text" required>
-  <label>Notities</label><input name="notes" type="text">
-  <div class="actions mt"><button class="btn" type="submit">Toevoegen</button></div>
-</form>
-{% endif %}
+<div class="page">
+  {% call ui.page_head('Referentietarieven', 'Wettelijke tarieven voor btw en energiebelasting. Er worden geen tarieven meegeleverd: alleen door u ingevoerde en geverifieerde tarieven worden gebruikt.') %}
+    {% if user.role.value == 'ADMIN' %}<button class="btn btn-primary" type="button" data-dialog-open="rate-dialog">{{ icon('plus') }}Tarief toevoegen</button>{% endif %}
+  {% endcall %}
+  <section class="panel">
+    {% if rates %}
+    <div class="table-wrap"><table class="table stack-sm">
+      <thead><tr><th>Soort</th><th>Schijf</th><th class="r">Tarief</th><th>Geldig</th><th>Bron</th><th>Status</th></tr></thead>
+      <tbody>{% for r in rates %}<tr>
+        <td class="primary">{{ {'VAT':'Btw','ENERGY_TAX_ELECTRICITY':'Energiebelasting elektriciteit','ENERGY_TAX_GAS':'Energiebelasting gas'}[r.kind.value] }}</td>
+        <td class="num" data-label="Schijf">{% if r.bracket_from is not none or r.bracket_to is not none %}{{ r.bracket_from|nl if r.bracket_from is not none else '0' }} – {{ r.bracket_to|nl if r.bracket_to is not none else '∞' }}{% else %}—{% endif %}</td>
+        <td class="r num" data-label="Tarief">{{ r.rate|nl }}{{ '%' if r.unit == 'percent' else ' / ' ~ r.unit }}</td>
+        <td class="num" data-label="Geldig">{{ r.valid_from|d }} – {{ r.valid_to|d if r.valid_to else 'heden' }}</td>
+        <td class="small" data-label="Bron">{{ r.source_reference }}</td>
+        <td data-label="Status">{% if r.verified_at %}{{ ui.chip('Geverifieerd', 'positive') }}{% elif user.role.value == 'ADMIN' %}<form method="post" action="/app/reference-rates/{{ r.id }}/verify" class="inline">{{ ui.csrf_field() }}<button class="btn btn-sm" type="submit">Verifiëren</button></form>{% else %}{{ ui.chip('Niet geverifieerd', 'review') }}{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{% call ui.empty('rate', 'Nog geen referentietarieven', 'Zolang er geen geverifieerde tarieven zijn, worden de controles op btw-tarief en energiebelasting overgeslagen. Voer tarieven in vanuit de officiële bron, met bronvermelding.') %}{% if user.role.value == 'ADMIN' %}<button class="btn btn-primary" type="button" data-dialog-open="rate-dialog">{{ icon('plus') }}Eerste tarief toevoegen</button>{% endif %}{% endcall %}{% endif %}
+  </section>
+  {% if user.role.value == 'ADMIN' %}
+  <dialog id="rate-dialog" aria-labelledby="rt-title">
+    <form method="post" action="/app/reference-rates">{{ ui.csrf_field() }}
+      <div class="dialog-head"><h2 id="rt-title">Referentietarief toevoegen</h2><p>Neem het tarief exact over uit de officiële bron. Het wordt pas gebruikt na verificatie.</p></div>
+      <div class="dialog-body">
+        <div class="fields"><div class="field"><label for="r-kind">Soort</label><select id="r-kind" name="kind">{% for k in kinds %}<option value="{{ k.value }}">{{ {'VAT':'Btw','ENERGY_TAX_ELECTRICITY':'Energiebelasting elektriciteit','ENERGY_TAX_GAS':'Energiebelasting gas'}[k.value] }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="r-unit">Eenheid</label><select id="r-unit" name="unit"><option value="percent">procent</option><option>kWh</option><option>m3</option></select></div></div>
+        <div class="fields"><div class="field"><label for="r-rate">Tarief</label><input id="r-rate" name="rate" type="text" inputmode="decimal" required></div>
+          <div class="field"><label for="r-bf">Schijf vanaf</label><input id="r-bf" name="bracket_from" type="text" inputmode="decimal"></div>
+          <div class="field"><label for="r-bt">Schijf tot</label><input id="r-bt" name="bracket_to" type="text" inputmode="decimal"></div></div>
+        <div class="fields"><div class="field"><label for="r-from">Geldig vanaf</label><input id="r-from" name="valid_from" type="date" required></div><div class="field"><label for="r-to">Geldig t/m</label><input id="r-to" name="valid_to" type="date"></div></div>
+        <div class="field"><label for="r-src">Bron</label><input id="r-src" name="source_reference" type="text" required placeholder="URL of wetsartikel"></div>
+      </div>
+      <div class="dialog-foot"><button class="btn" type="button" data-dialog-close>Annuleren</button><button class="btn btn-primary" type="submit">Toevoegen</button></div>
+    </form>
+  </dialog>
+  {% endif %}
+</div>
 {% endblock %}

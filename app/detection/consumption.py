@@ -17,6 +17,7 @@ from app.detection.base import (
     invoice_ref,
     line_evidence,
     reading_evidence,
+    upper_first,
 )
 from app.domain.confidence import EvidenceQuality, confidence_from_evidence
 from app.domain.enums import Classification, LineCategory, ReadingType
@@ -105,7 +106,7 @@ def _compare(ctx, inv, register, begin: MeterReading, end: MeterReading, source_
         confidence=confidence_from_evidence(qualities, extraction_confidence=lines[0].confidence),
         title=f"Gefactureerd verbruik wijkt af van meterstanden ({inv.label}, {REGISTER_NL.get(register, register)})",
         description=(
-            f"{invoice_ref(inv).capitalize()} rekent {format_decimal_nl(invoiced)} {unit} "
+            f"{upper_first(invoice_ref(inv))} rekent {format_decimal_nl(invoiced)} {unit} "
             f"({REGISTER_NL.get(register, register)}). Volgens {source_label} is het verbruik "
             f"({format_decimal_nl(end.reading)} − {format_decimal_nl(begin.reading)}){mult_txt} = "
             f"{format_decimal_nl(expected)} {unit}. Verschil: {format_decimal_nl(invoiced - expected)} {unit}."
@@ -237,7 +238,7 @@ def detect_estimated_readings(ctx: AnalysisContext) -> list[Finding]:
             classification=Classification.ANOMALY,
             confidence=confidence_from_evidence([EvidenceQuality.ESTIMATED]),
             title=f"Factuur gebaseerd op geschatte meterstand ({inv.label})",
-            description=(f"{invoice_ref(inv).capitalize()} gebruikt {len(rs)} geschatte meterstand(en). Vergelijk met "
+            description=(f"{upper_first(invoice_ref(inv))} gebruikt {len(rs)} geschatte meterstand(en). Vergelijk met "
                          "werkelijke standen (bijv. meterdata van de netbeheerder of een eigen opname) om te bepalen "
                          "of het verbruik is overschat. Op zichzelf is dit geen fout."),
             reason="Geschatte in plaats van werkelijke meterstand.",
