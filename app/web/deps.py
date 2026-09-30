@@ -90,7 +90,15 @@ def _time(v) -> str:
     return v.strftime("%H:%M:%S") if v else ""
 
 
-templates.env.filters.update(eur=format_eur, nl=_num, d=_date, pct=_pct, cat=_cat, unit=_unit, price=_price,
+def _eur_display(value) -> str:
+    """Format a display-only number (e.g. from the observability JSON) as euros; never used in calculations."""
+    from decimal import Decimal
+
+    return format_eur(Decimal(str(value or 0)))
+
+
+templates.env.filters.update(eur=format_eur, eur_display=_eur_display,
+                             nl=_num, d=_date, pct=_pct, cat=_cat, unit=_unit, price=_price,
                              ago=_ago, duration=_duration, pretty=_pretty, hms=_time)
 from app.web.icons import LOGO, icon  # noqa: E402
 from app.web.view import column_chart, finding_view, fmt_value, funnel_bar, hbar, meter_bar, progress_bar  # noqa: E402

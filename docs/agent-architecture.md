@@ -16,6 +16,7 @@ import the existing models and services directly:
 | `app/integrations/` | Connections to the outside world. Currently `web/`: safe HTTP, OpenStreetMap, websites, and a test source |
 | `app/models/agents.py` | Database tables |
 | `app/services/agent_ops.py`, `app/web/routes_ops.py`, `app/web/templates/ops/` | AI Operations dashboard |
+| `app/agents/topology.py`, `app/services/observability.py`, `app/services/simulation.py` | Command center: real connections, the event/snapshot layer and the development-only demo (see `docs/command-center.md`) |
 
 ## Building blocks
 

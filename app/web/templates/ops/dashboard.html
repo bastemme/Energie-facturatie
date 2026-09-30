@@ -1,109 +1,182 @@
 {% extends "app_base.html" %}
 {% import "_ops.html" as ops with context %}
 {% import "_crm.html" as crm with context %}
-{% block title %}AI Operations{% endblock %}
+{% block title %}Operations{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/ops.css?v=3">
+<script src="/static/ops.js?v=3" defer></script>{% endblock %}
 {% block content %}
-{% set c = d.counts %}
-<div class="page page-wide" data-pulse="/app/ops/pulse" data-pulse-v="{{ pulse }}">
-  {% call ui.page_head('AI Operations', 'De hele pijplijn live: wat elke agent doet, wat op u wacht en wat er net is gebeurd.') %}
-    <span class="row small muted">Onderzoek {{ crm.env(not research.is_test_data) }} E-mail {{ crm.env(mail.live) }}</span>
-<form method="post" action="/app/ops/start" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="job" value="daily"><button class="btn" type="submit">{{ icon('flow') }}Dagelijkse run</button></form>
-    <form method="post" action="/app/ops/run" class="inline">{{ ui.csrf_field() }}<button class="btn" type="submit" data-tip="Verwerk nu alle taken die klaarstaan">{{ icon('play') }}Wachtrij verwerken</button></form>
-    <form method="post" action="/app/inbox/fetch" class="inline">{{ ui.csrf_field() }}<button class="btn" type="submit"{% if not mail.can_read %} disabled{% endif %}>{{ icon('inbox') }}Mailbox lezen</button></form>
-    <a class="btn btn-primary" href="/app/leads/find">{{ icon('search') }}Leads zoeken</a>
-  {% endcall %}
-
-  <section class="ops-strip" aria-label="Status">
-    <div class="ops-live"><b>Command center</b><span><i class="pulse-dot"></i>Live · {{ c.operational }} van {{ c.total }} agents operationeel</span></div>
-    <div class="ops-metric"><span class="n">{{ ui.num(c.running, 'ops-running') }}</span><span class="l">Actief</span></div>
-    <div class="ops-metric"><span class="n">{{ ui.num(c.queued, 'ops-queued') }}</span><span class="l">In wachtrij</span></div>
-    <div class="ops-metric{{ ' warn' if nav.approve }}"><span class="n">{{ ui.num(nav.approve, 'ops-approve') }}</span><span class="l">E-mails te beoordelen</span></div>
-    <div class="ops-metric{{ ' warn' if c.approvals }}"><span class="n">{{ ui.num(c.approvals, 'ops-approvals') }}</span><span class="l">Taken te beoordelen</span></div>
-    <div class="ops-metric"><span class="n">{{ ui.num(nav.inbox, 'ops-inbox') }}</span><span class="l">Ongelezen reacties</span></div>
-    <div class="ops-metric{{ ' bad' if c.failed }}"><span class="n">{{ ui.num(c.failed, 'ops-failed') }}</span><span class="l">Agent in fout</span></div>
-  </section>
-
-  <section class="section" aria-label="Pijplijn">
-    <div class="section-head"><h2>Leadgeneratie-pijplijn</h2><a href="/app/leads">Alle leads {{ icon('arrow-right') }}</a></div>
-    <ol class="pipe{{ ' flowing' if pipeline|selectattr('active')|list }}">
-      {% for s in pipeline %}
-      <li class="{{ 'human' if s.actor == 'human' }}{{ ' active' if s.active }}{{ ' attn' if s.key == 'approval' and s.count }}"><a href="{{ s.href }}">
-        <span class="p-step">{{ s.label }}</span>
-        <span class="p-n">{{ ui.num(s.count, 'pipe-' ~ s.key) }}</span>
-        <span class="p-note">{{ s.note }}</span>
-        <span class="p-actor">{% if s.actor == 'human' %}{{ icon('user') }}Mens{% else %}{{ icon('bolt') }}{{ d.names.get(s.actor, s.actor) }}{% endif %}</span>
-      </a></li>
-      {% endfor %}
-    </ol>
-  </section>
-
-  <div class="grid-3-1">
-    <section class="panel">
-      <div class="panel-head"><div><h2>Live activiteit</h2><p>Elke stap van agents en medewerkers, nieuwste eerst.</p></div><span class="row small muted"><i class="pulse-dot"></i>live</span></div>
-      {% if activity %}
-      <ol class="feed feed-scroll">
-        {% for a in activity %}
-        <li><time>{{ a.at|hms }}</time>
-          <span class="who {{ a.actor_kind }}">{% if a.actor_kind == 'agent' %}{{ ops.mono(a.actor)|striptags }}{% elif a.actor_kind == 'human' %}{{ icon('user') }}{% else %}{{ icon('settings') }}{% endif %}</span>
-          <span class="what"><b>{{ a.actor }}</b> <span class="msg">{{ a.message }}</span><span class="co">{% if a.company %}<a href="/app/leads/{{ a.prospect_id }}">{{ a.company }}</a> · {% endif %}{% if a.task_id %}<a href="/app/ops/tasks/{{ a.task_id }}">taak</a> · {% endif %}{{ a.at|ago }}</span></span>
-        </li>
-        {% endfor %}
-      </ol>
-      {% else %}{% call ui.empty('bolt', 'Nog geen activiteit', 'Start een leadonderzoek. U ziet hier live hoe elke agent bedrijven vindt, kwalificeert, contacten zoekt en e-mails opstelt.') %}<a class="btn btn-primary btn-sm" href="/app/leads/find">Leads zoeken</a>{% endcall %}{% endif %}
-    </section>
-
-    <div class="stack-lg">
-      {% if nav.approve %}
-      <a class="panel panel-pad row-between" href="/app/outreach?tab=approval"><span><b>{{ nav.approve }} e-mail{{ 's' if nav.approve != 1 }} wacht{{ 'en' if nav.approve != 1 }} op uw goedkeuring</b><br><span class="small muted">Niets wordt verstuurd zonder uw akkoord.</span></span>{{ icon('arrow-right') }}</a>
-      {% endif %}
-      {% if d.approvals %}
-      <section class="panel">
-        <div class="panel-head"><h2>Goedkeuring nodig</h2>{{ ui.chip(d.approvals|length ~ ' open', 'review') }}</div>
-        {% for a in d.approvals %}{{ ops.approval_card(a, d.names) }}{% endfor %}
-      </section>
-      {% endif %}
-      <section class="panel">
-        <div class="panel-head"><h2>Takenwachtrij</h2><span class="small muted">{{ d.running|length }} bezig · {{ d.queued|length }} wachtend</span></div>
-        {% if d.running or d.queued or d.waiting %}
-        <ul class="tasklist">{% for t in d.running + d.waiting + d.queued[:8] %}{{ ops.task_row(t, d.names, d.runnable) }}{% endfor %}</ul>
-        {% if d.queued|length > 8 %}<div class="panel-foot">En nog {{ d.queued|length - 8 }} taken in de wachtrij</div>{% endif %}
-        {% else %}<div class="panel-body small muted">{{ icon('check-circle') }} Geen open taken.</div>{% endif %}
-        <div class="panel-foot"><a href="/app/ops/tasks">Alle taken en geschiedenis {{ icon('arrow-right') }}</a></div>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><h2>Fouten</h2>{% if d.errors %}{{ ui.chip(d.errors|length ~ ' recent', 'critical') }}{% endif %}</div>
-        {% if d.errors %}<ul class="tasklist">{% for t in d.errors %}{{ ops.task_row(t, d.names, side=t.finished_at|ago) }}{% endfor %}</ul>
-        {% else %}<div class="panel-body small muted">{{ icon('check-circle') }} Geen mislukte taken.</div>{% endif %}
-      </section>
+{% set c = d.counts %}{% set m = snap.metrics %}
+<div class="page page-wide ops-os" data-ops>
+  <header class="os-head">
+    <div class="os-title">
+      <span class="os-eyebrow">Factuurspoor Operations</span>
+      <h1>Van factuur tot resultaat</h1>
+      <p>Zestien agents verwerken facturen tot onderbouwde terugvorderingen. Elke stap, elke overdracht en elk bewijsstuk is hier te volgen.</p>
     </div>
+    <div class="os-actions">
+      <span class="os-mode live" data-mode-badge><i></i><b data-mode-label>LIVE</b></span>
+      {% if boot.demo %}<button class="btn" type="button" data-demo-play>{{ icon('play') }}<span data-demo-play-label>Demo afspelen</span></button>{% endif %}
+      <form method="post" action="/app/ops/start" class="inline">{{ ui.csrf_field() }}<input type="hidden" name="job" value="daily"><button class="btn" type="submit" data-tip="De Orchestrator plant het werk van vandaag">{{ icon('flow') }}Dagelijkse run</button></form>
+      <form method="post" action="/app/ops/run" class="inline">{{ ui.csrf_field() }}<button class="btn" type="submit" data-tip="Verwerk nu alle taken die klaarstaan">{{ icon('play') }}Wachtrij verwerken</button></form>
+      <a class="btn btn-primary" href="/app/leads/find">{{ icon('search') }}Leads zoeken</a>
+    </div>
+  </header>
+
+  <div class="os-demo-banner" data-demo-banner hidden>
+    <span class="dm"><i></i>DEMO MODE</span>
+    <span>Gesimuleerde run met een fictieve factuur. Niets hiervan is echte activiteit, en er wordt niets opgeslagen of verstuurd.</span>
+    <button class="btn btn-sm" type="button" data-demo-stop>Terug naar live</button>
   </div>
 
-  <div class="agent-groups">
-    {% for group, cards in d.groups.items() %}
-    <section>
-      <div class="agent-group-head"><h2>{{ group }}</h2><span class="small muted">{{ cards|selectattr('state','ne','planned')|list|length }} van {{ cards|length }} operationeel</span></div>
-      <div class="agent-grid">
-        {% for card in cards %}{% set a = card.agent %}
-        <a class="agent-card s-{{ card.state }}" href="/app/ops/agents/{{ a.id }}">
-          <div class="ag-head">{{ ops.mono(a.name) }}<div><div class="ag-name">{{ a.name }}</div><div class="ag-role">{{ a.role }}</div></div></div>
-          <div class="ag-activity">
-            {% if card.current_task and card.state == 'running' %}
-            <div class="verb running"><i></i><span>{{ card.current_task.title }}</span></div>
-            <div class="step">{{ card.step or 'Gestart' }}{% if card.progress %} · {{ card.progress[0] }} / {{ card.progress[1] }}{% endif %}</div>
-            {% if card.progress %}{{ progress_bar(card.progress[0], card.progress[1]) }}{% endif %}
-            {% elif card.state == 'planned' %}<div class="step">{{ a.description }}</div>
-            {% else %}
-            <div class="verb {{ card.state if card.last_activity or card.state != 'idle' else 'never' }}"><i></i><span>{% if card.state == 'queued' %}{{ card.queued }} {{ 'taak' if card.queued == 1 else 'taken' }} in wachtrij{% elif card.state == 'waiting' %}Wacht op uw beoordeling{% elif card.state == 'failed' %}Laatste taak mislukt{% elif card.last_activity %}Laatst: {{ card.last_activity.created_at|ago }}{% else %}Nog niet gedraaid{% endif %}</span></div>
-            <div class="step">{% if card.last_activity %}{{ card.last_activity.message }}{% else %}{{ a.description }}{% endif %}</div>
-            {% endif %}
-          </div>
-          {% if card.state != 'planned' %}<div class="ag-stats"><span><b>{{ card.completed }}</b> afgerond</span><span class="{{ 'err' if card.failed }}"><b>{{ card.failed }}</b> fouten</span><span>{% if a.last_run_at %}{{ a.last_run_at|ago }}{% else %}nooit gedraaid{% endif %}</span></div>{% endif %}
-          <div class="ag-foot"><span class="state {{ card.state }}" data-state-key="agent-{{ a.id }}">{{ card.status_word }}</span><span>{% if card.queued and card.state != 'queued' %}{{ card.queued }} in wachtrij{% endif %}</span></div>
-        </a>
-        {% endfor %}
+  <section class="os-metrics" aria-label="Kerncijfers">
+    {% macro metric(key, label, value, fmt='int', sub='', tone='') %}<div class="osm {{ tone }}" data-metric="{{ key }}" data-format="{{ fmt }}" data-value="{{ value }}"><span class="l">{{ label }}</span><span class="v num" data-v>{{ value|eur_display if fmt == 'eur' else value }}</span><span class="s">{{ sub }}</span></div>{% endmacro %}
+    {{ metric('invoices', 'Facturen verwerkt', m.invoices, sub='Uniek, zonder dubbele aanlevering') }}
+    {{ metric('analyses', 'Actieve analyses', m.analyses, sub='Intake, analyse en controle') }}
+    {{ metric('potential', 'Mogelijke terugvordering', m.potential, 'eur', 'Nog te verifiëren', 'review') }}
+    {{ metric('validated', 'Gevalideerd', m.validated, 'eur', 'Bevestigd door een specialist', 'brand') }}
+    {{ metric('cases_open', 'Dossiers in behandeling', m.cases_open, sub='Onderzoek en ingediend') }}
+    {{ metric('cases_recovered', 'Dossiers teruggevorderd', m.cases_recovered, sub='Geld ontvangen', tone='positive') }}
+  </section>
+
+  <section class="os-stage" data-stage aria-label="Het agentnetwerk">
+    <div class="stage-bg" aria-hidden="true"><i class="glow"></i></div>
+    <div class="stage-top">
+      <span class="stage-title"><i class="live-dot"></i><b>Agentnetwerk</b><span data-stage-summary>{{ snap.operational }} van {{ snap.total }} agents operationeel</span></span>
+      <span class="stage-legend">
+        <span><i class="lg handoff"></i>Overdracht</span><span><i class="lg approval"></i>Na goedkeuring door een mens</span><span><i class="lg dispatch"></i>Ingepland door Orchestrator</span><span><i class="lg reads"></i>Leest uitvoer</span>
+      </span>
+    </div>
+    <svg class="stage-edges" data-edges aria-hidden="true"></svg>
+    <div class="stage-grid">
+    <div class="net" data-net>
+      {% for lane in topo.lanes %}
+      <div class="lane lane-{{ lane.id }}">
+        <span class="lane-label">{{ lane.label }}</span>
+        <div class="lane-nodes">
+          {% for aid in lane.agents %}{% set s = snap.agents.get(aid, {}) %}
+          <button type="button" class="node n-{{ aid }}" data-node="{{ aid }}" data-state="{{ s.state or 'idle' }}" aria-label="{{ topo.names[aid] }}: {{ s.word }}">
+            {% if topo.phases.get(aid) %}<span class="n-phase">{{ topo.phases[aid] }}</span>{% endif %}
+            <span class="n-ring"><i class="n-orbit" aria-hidden="true"></i>{{ ops.mono(topo.names[aid]) }}</span>
+            <span class="n-name">{{ topo.names[aid] }}</span>
+            <span class="n-word" data-state-key="agent-{{ aid }}">{{ s.word }}</span>
+            <span class="n-task" data-n-task>{% if s.task and s.state == 'running' %}{{ s.task.title }}{% endif %}</span>
+            <span class="n-step" data-n-step>{% if s.state == 'running' %}{{ s.step or 'Gestart' }}{% if s.progress %} · {{ s.progress[0] }} / {{ s.progress[1] }}{% endif %}{% endif %}</span>
+            <span class="n-bar" aria-hidden="true"><i data-n-bar></i></span>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <aside class="rail" aria-label="Live case">
+      <section class="rail-case live-case" data-case aria-live="polite">
+        <div class="rail-head"><span class="oc-eyebrow">Live case</span><span class="oc-link" data-case-link></span></div>
+        <div data-case-body>
+          <div class="oc-empty">{{ icon('invoice') }}<b>Nog geen factuur in behandeling</b><span>Upload facturen bij een klant; de agents nemen het vanaf daar over{% if boot.demo %}, of speel de demo af{% endif %}.</span></div>
+        </div>
+      </section>
+      <section class="rail-op opportunity" data-opportunity>
+        <div class="rail-head"><span class="oc-eyebrow">Kans</span><span class="op-status" data-op-status>Geen bevinding</span></div>
+        <span class="op-label" data-op-label>Mogelijke terugvordering</span>
+        <span class="op-amount num" data-op-amount>€ 0,00</span>
+        <div class="op-meta"><span>Zekerheid <b data-op-conf>—</b></span><span>Bewijs <b data-op-src>0 bronnen</b></span></div>
+        <ol class="op-track" aria-label="Status van het bedrag"><li data-op-step="potential">Mogelijk</li><li data-op-step="validated">Gevalideerd</li><li data-op-step="claimed">Geclaimd</li><li data-op-step="recovered">Teruggevorderd</li></ol>
+      </section>
+    </aside>
+    </div>
+    <div class="case-token" data-token hidden><i class="doc" aria-hidden="true"></i><span data-token-ref></span><b data-token-amt></b></div>
+    <div class="fx" data-fx aria-hidden="true"></div>
+  </section>
+
+  <div class="os-grid">
+    <section class="os-card evidence" data-evidence>
+      <div class="oc-head"><span class="oc-eyebrow">Bewijs</span><span class="ev-title" data-ev-title>Nog geen bevinding</span></div>
+      <div class="ev-graph" data-ev-graph>
+        <svg class="ev-lines" data-ev-lines aria-hidden="true"></svg>
+        <div class="ev-root"><span class="ev-node root" data-ev-root>{{ icon('invoice') }}Factuur</span></div>
+        <ul class="ev-sources">
+          {% for e in topo.evidence %}<li class="ev-node src" data-ev="{{ e.key }}" tabindex="0"><b>{{ e.label }}</b><span data-ev-item>niet gebruikt</span></li>{% endfor %}
+        </ul>
+        <div class="ev-out"><span class="ev-node finding" data-ev-finding>Bevinding</span><span class="ev-node valid" data-ev-valid>{{ icon('check') }}Gevalideerd</span></div>
       </div>
     </section>
-    {% endfor %}
+
+    <section class="os-card timeline" aria-label="Uitvoeringstijdlijn">
+      <div class="oc-head"><span class="oc-eyebrow">Uitvoering</span><span class="small muted" data-tl-sub>Nog geen case</span></div>
+      <ol class="tlv" data-timeline>{% for st in topo.stages %}<li class="pending"><i></i><span>{{ st.label }}</span></li>{% endfor %}</ol>
+    </section>
+
+    <section class="os-card stream" data-stream-card>
+      <div class="oc-head"><span class="oc-eyebrow">Activiteit</span><span class="small muted" data-stream-count></span></div>
+      <ol class="stream-list" data-stream></ol>
+      <div class="oc-empty small" data-stream-empty>{{ icon('bolt') }}<span>Nog geen activiteit in de afgelopen minuten.</span></div>
+    </section>
   </div>
+
+  <details class="os-more"{% if d.approvals or nav.approve or d.errors %} open{% endif %}>
+    <summary><span><b>Werkvoorraad en details</b><span class="small muted"> · pijplijn, goedkeuringen, wachtrij en fouten</span></span>{% if d.approvals or nav.approve %}{{ ui.chip((d.approvals|length + nav.approve) ~ ' wacht op u', 'review') }}{% endif %}</summary>
+    <section class="section" aria-label="Pijplijn">
+      <div class="section-head"><h2>Leadgeneratie-pijplijn</h2><a href="/app/leads">Alle leads {{ icon('arrow-right') }}</a></div>
+      <ol class="pipe{{ ' flowing' if pipeline|selectattr('active')|list }}">
+        {% for s in pipeline %}
+        <li class="{{ 'human' if s.actor == 'human' }}{{ ' active' if s.active }}{{ ' attn' if s.key == 'approval' and s.count }}"><a href="{{ s.href }}">
+          <span class="p-step">{{ s.label }}</span>
+          <span class="p-n">{{ ui.num(s.count, 'pipe-' ~ s.key) }}</span>
+          <span class="p-note">{{ s.note }}</span>
+          <span class="p-actor">{% if s.actor == 'human' %}{{ icon('user') }}Mens{% else %}{{ icon('bolt') }}{{ d.names.get(s.actor, s.actor) }}{% endif %}</span>
+        </a></li>
+        {% endfor %}
+      </ol>
+    </section>
+    <div class="grid-2">
+      <div class="stack-lg">
+        {% if nav.approve %}
+        <a class="panel panel-pad row-between" href="/app/outreach?tab=approval"><span><b>{{ nav.approve }} e-mail{{ 's' if nav.approve != 1 }} wacht{{ 'en' if nav.approve != 1 }} op uw goedkeuring</b><br><span class="small muted">Niets wordt verstuurd zonder uw akkoord.</span></span>{{ icon('arrow-right') }}</a>
+        {% endif %}
+        {% if d.approvals %}
+        <section class="panel">
+          <div class="panel-head"><h2>Goedkeuring nodig</h2>{{ ui.chip(d.approvals|length ~ ' open', 'review') }}</div>
+          {% for a in d.approvals %}{{ ops.approval_card(a, d.names) }}{% endfor %}
+        </section>
+        {% endif %}
+        <section class="panel">
+          <div class="panel-head"><h2>Takenwachtrij</h2><span class="small muted">{{ d.running|length }} bezig · {{ d.queued|length }} wachtend</span></div>
+          {% if d.running or d.queued or d.waiting %}
+          <ul class="tasklist">{% for t in d.running + d.waiting + d.queued[:8] %}{{ ops.task_row(t, d.names, d.runnable) }}{% endfor %}</ul>
+          {% if d.queued|length > 8 %}<div class="panel-foot">En nog {{ d.queued|length - 8 }} taken in de wachtrij</div>{% endif %}
+          {% else %}<div class="panel-body small muted">{{ icon('check-circle') }} Geen open taken.</div>{% endif %}
+          <div class="panel-foot"><a href="/app/ops/tasks">Alle taken, traces en logs {{ icon('arrow-right') }}</a></div>
+        </section>
+      </div>
+      <div class="stack-lg">
+        <section class="panel">
+          <div class="panel-head"><h2>Fouten</h2>{% if d.errors %}{{ ui.chip(d.errors|length ~ ' recent', 'critical') }}{% endif %}</div>
+          {% if d.errors %}<ul class="tasklist">{% for t in d.errors %}{{ ops.task_row(t, d.names, side=t.finished_at|ago) }}{% endfor %}</ul>
+          {% else %}<div class="panel-body small muted">{{ icon('check-circle') }} Geen mislukte taken.</div>{% endif %}
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h2>Mens en systeem</h2><span class="small muted">Laatste stappen buiten de agents</span></div>
+          {% set humans = activity|rejectattr('actor_kind', 'equalto', 'agent')|list %}
+          {% if humans %}<ol class="feed">{% for a in humans[:6] %}<li><time>{{ a.at|hms }}</time><span class="who {{ a.actor_kind }}">{% if a.actor_kind == 'human' %}{{ icon('user') }}{% else %}{{ icon('settings') }}{% endif %}</span><span class="what"><b>{{ a.actor }}</b> <span class="msg">{{ a.message }}</span><span class="co">{% if a.company %}<a href="/app/leads/{{ a.prospect_id }}">{{ a.company }}</a> · {% endif %}{{ a.at|ago }}</span></span></li>{% endfor %}</ol>
+          {% else %}<div class="panel-body small muted">Nog geen stappen van medewerkers.</div>{% endif %}
+        </section>
+      </div>
+    </div>
+  </details>
+
+  <script type="application/json" id="ops-boot">{{ boot|tojson }}</script>
+</div>
+<div class="ops-os-layer" data-ops-layer>
+  <div class="os-scrim" data-panel-scrim hidden></div>
+  <aside class="os-panel" data-agent-panel aria-label="Agentdetails" tabindex="-1" hidden>
+    <div class="ap-head">
+      <span class="ap-mono" data-ap-mono></span>
+      <div><b data-ap-name></b><span data-ap-role></span></div>
+      <button class="btn btn-ghost btn-sm" type="button" data-ap-close aria-label="Sluiten">{{ icon('close') }}</button>
+    </div>
+    <div class="ap-state" data-ap-state></div>
+    <div class="ap-body" data-ap-body></div>
+  </aside>
+
 </div>
 {% endblock %}

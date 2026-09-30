@@ -20,6 +20,7 @@ from app.domain.enums import TaskStatus
 from app.integrations.email.provider import provider_status
 from app.integrations.web.research import get_research_provider
 from app.models import AgentApproval, AgentLog, AgentMessage, AgentRecord, AgentTask, Prospect, User
+from app.services import observability, simulation
 from app.services.agent_ops import activity, agent_state, dashboard, pipeline, pulse
 from app.services.audit import audit
 from app.web.deps import client_ip, flash, redirect, render
@@ -36,8 +37,31 @@ def _schedule(background: BackgroundTasks) -> None:
 
 @router.get("/app/ops")
 def ops_dashboard(request: Request, user: User = Depends(require_staff), db: Session = Depends(get_db)):
+    snap = observability.snapshot(db)
     return render(request, "ops/dashboard.html", user=user, d=dashboard(db), pulse=pulse(db), pipeline=pipeline(db),
-                  activity=activity(db), mail=provider_status(), research=get_research_provider())
+                  activity=activity(db), mail=provider_status(), research=get_research_provider(), snap=snap,
+                  topo=observability.topology(), boot={"snapshot": snap, "topology": observability.topology(),
+                                                       "events": observability.recent_events(db),
+                                                       "demo": demo_available()})
+
+
+def demo_available() -> bool:
+    """DEMO MODE is a development tool: never offered in production."""
+    return not get_settings().is_production
+
+
+@router.get("/app/ops/api/live")
+def ops_api_live(user: User = Depends(require_staff), db: Session = Depends(get_db)):
+    """Snapshot plus the events of the last minutes (the browser de-duplicates by id)."""
+    return JSONResponse({"snapshot": observability.snapshot(db), "events": observability.recent_events(db)},
+                        headers={"Cache-Control": "no-store"})
+
+
+@router.get("/app/ops/api/demo")
+def ops_api_demo(user: User = Depends(require_staff)):
+    if not demo_available():
+        raise HTTPException(status_code=404)
+    return JSONResponse(simulation.scenario(), headers={"Cache-Control": "no-store"})
 
 
 @router.get("/app/ops/pulse")

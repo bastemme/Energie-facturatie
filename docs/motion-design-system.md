@@ -174,6 +174,27 @@ The **recovery journey** under the stage follows the money: € 0 → Mogelijk (
 
 ---
 
+## 6b. Command center (`/app/ops`)
+
+The command center is the one place where motion is continuous, because the system it shows is
+continuously at work. The same rules apply (see `docs/command-center.md` for the full description):
+
+| Motion | Duration and easing | Meaning |
+|---|---|---|
+| Packet along a connection | 700–1400 ms (by path length), in-out | Data is handed from one agent to another |
+| Node hit, done flash, validation sweep | 700 / 900 / 1200 ms, `--e-out` | Received, finished, validated |
+| Ring pulse and orbiting particles | 1.8 s / 3.2 s loops | Only while the agent is running |
+| Evidence sparks | about 800 ms, staggered by 45 ms | A source was found |
+| Amount chip rising over a node | 2.8 s | A finding or a validated amount |
+| Invoice token moving along the lane | 900 ms, in-out | Where the invoice is now |
+| Metrics | 1100 ms count-up on arrival, then 700 ms when a value changes | New figures |
+| Grid drift, glow, shimmer | 18–90 s | Ambient: the system is on. The glow grows with the number of running agents |
+
+The count-up on arrival is a deliberate exception to "only what changed moves": the command center
+is a status screen that is opened to see the current totals.
+
+---
+
 ## 7. Reduced motion and small screens
 
 `prefers-reduced-motion: reduce`:

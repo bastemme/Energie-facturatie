@@ -43,7 +43,11 @@ def test_full_workflow_through_the_ui(app_client):  # noqa: F811
         msg = s.scalars(select(OutreachMessage)).first()
         mid, pid = msg.id, msg.prospect_id
     ops = app_client.get("/app/ops").text
-    assert "Live activiteit" in ops and "Lead Researcher" in ops
+    assert "Agentnetwerk" in ops and "Lead Researcher" in ops
+    events = app_client.get("/app/ops/api/live").json()["events"]  # the command center sees the handoffs
+    handoffs = {(e["agent"], e["to"]) for e in events if e["kind"] == "handoff"}
+    assert ("lead_researcher", "lead_qualifier") in handoffs and ("contact_researcher", "outreach") in handoffs
+    assert all(e["mode"] == "live" for e in events)
     page = app_client.get(f"/app/outreach/{mid}").text
     for part in ("Goedkeuren en versturen", "Bewerken", "Afwijzen", "Waarom dit bedrijf", "Onderzoek en bronnen"):
         assert part in page
