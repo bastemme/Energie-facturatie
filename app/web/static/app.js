@@ -395,4 +395,5 @@
   /* ======================================================================= start */
   enhance(document, false);
   animateChanges(document, null);
+  html.setAttribute("data-js-ready", "");
 })();
