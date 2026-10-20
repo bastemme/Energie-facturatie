@@ -1,0 +1,2 @@
+# Alleen voor fase 1/2 (read-only inspectie). pywinauto brengt pywin32 en comtypes mee.
+pywinauto==0.6.9
